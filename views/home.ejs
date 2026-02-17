@@ -2,20 +2,30 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title><%= siteConfig.siteName %> - Home</title>
+  <title><%= (siteConfig && siteConfig.siteName) || 'ExHub' %> - Home</title>
   <link rel="stylesheet" href="/css/main.css">
 </head>
 <body class="bg-grid">
+
+<%
+  // Fallback biar template tidak error kalau ada field yang belum di-set
+  const siteName       = (siteConfig && siteConfig.siteName)       || 'ExHub';
+  const discordInvite  = (siteConfig && siteConfig.discordInvite)  || '#';
+  const loaderUrl      = (siteConfig && siteConfig.loader)         || '';
+  const totalKeys      = (stats && stats.totalKeys)  || 0;
+  const activeKeys     = (stats && stats.activeKeys) || 0;
+%>
+
 <header class="nav">
   <div class="nav-left">
     <img src="/img/logo-exhub.png" class="logo">
-    <span class="nav-title"><%= siteConfig.siteName %></span>
+    <span class="nav-title"><%= siteName %></span>
   </div>
   <nav class="nav-links">
     <a href="/" class="active">Home</a>
     <a href="/get-key">Get Key</a>
     <a href="/scripts">Scripts</a>
-    <% if (user) { %>
+    <% if (typeof user !== 'undefined' && user) { %>
       <a href="/dashboard">Dashboard</a>
       <a href="/logout">Logout</a>
     <% } else { %>
@@ -26,14 +36,14 @@
 
 <main class="hero">
   <div class="hero-text">
-    <h1>Dominate Every Game<br>With <span class="accent"><%= siteConfig.siteName %>.</span></h1>
+    <h1>Dominate Every Game<br>With <span class="accent"><%= siteName %>.</span></h1>
     <p class="hero-sub">
       Exclusive Roblox scripts with features you'll only find here,
       built for better performance and gameplay experience.
     </p>
 
     <div class="hero-buttons">
-      <a href="<%= siteConfig.discordInvite %>" class="btn btn-discord">
+      <a href="<%= discordInvite %>" class="btn btn-discord">
         <img src="/img/logo-discord.png" class="icon-sm">
         Join Community
       </a>
@@ -49,11 +59,11 @@
     <div class="hero-stats">
       <div class="stat">
         <span class="stat-label">Total Keys</span>
-        <span class="stat-value"><%= stats.totalKeys %></span>
+        <span class="stat-value"><%= totalKeys %></span>
       </div>
       <div class="stat">
         <span class="stat-label">Active Keys</span>
-        <span class="stat-value"><%= stats.activeKeys %></span>
+        <span class="stat-value"><%= activeKeys %></span>
       </div>
     </div>
   </div>
@@ -64,11 +74,11 @@
       <span class="code-title">loader.lua</span>
     </div>
     <pre class="code-block">
--- load <%= siteConfig.siteName %> universal loader
+-- load <%= siteName %> universal loader
 loadstring(game:HttpGet(
-  "<%= siteConfig.loader.replace(/"/g, '&quot;') %>"
+  "<%= loaderUrl %>"
 ))()</pre>
-    <button class="btn btn-copy" data-copy="<%= siteConfig.loader %>">
+    <button class="btn btn-copy" data-copy="<%= loaderUrl %>">
       Copy Loader
     </button>
   </div>

@@ -1,0 +1,88 @@
+{
+  "siteName": "EXHub",
+  "tagline": "Dominate Every Game With EXHub.",
+  "discordInvite": "https://discord.gg/yourinvite",
+  "loader": "loadstring(game:HttpGet(\"https://exc-webs.vercel.app/api/script/loader\", true))()",
+  "scripts": [
+    {
+      "id": "spear-fishing",
+      "name": "Spear Fishing",
+      "description": "Casual asymmetrical horror game script for EXHub.",
+      "version": "v1.16+",
+      "status": "working",
+      "isFree": true,
+      "thumbnail": "/img/spear-fishing.jpg",
+      "gameUrl": "https://www.roblox.com/games/XXXXXXXX/Spear-Fishing"
+    },
+    {
+      "id": "indo-hangout",
+      "name": "Indo Hangout",
+      "description": "Word game script where every last letter counts.",
+      "version": "v1.0",
+      "status": "working",
+      "isFree": true,
+      "thumbnail": "/img/indo-hangout.png",
+      "gameUrl": "https://www.roblox.com/games/YYYYYYYY/Indo-Hangout"
+    },
+    {
+      "id": "indo-beach",
+      "name": "Indo Beach",
+      "description": "Word game script where every last letter counts.",
+      "version": "v1.0",
+      "status": "working",
+      "isFree": true,
+      "thumbnail": "/img/indo-beach.png",
+      "gameUrl": "https://www.roblox.com/games/ZZZZZZZZ/Indo-Beach"
+    },
+    {
+      "id": "dungeon-heroes",
+      "name": "Dungeon Heroes",
+      "description": "Word game script where every last letter counts.",
+      "version": "v1.0",
+      "status": "working",
+      "isFree": true,
+      "thumbnail": "/img/dungeon-heroes.png",
+      "gameUrl": "https://www.roblox.com/games/ZZZZZZZZ/Dungeon-Heroes"
+    },
+    {
+      "id": "build-a-zoo",
+      "name": "Build A Zoo",
+      "description": "Word game script where every last letter counts.",
+      "version": "v1.0",
+      "status": "working",
+      "isFree": true,
+      "thumbnail": "/img/build-a-zoo.png",
+      "gameUrl": "https://www.roblox.com/games/ZZZZZZZZ/Build-A-Zoo"
+    },
+    {
+      "id": "indo-place",
+      "name": "Indo Place",
+      "description": "Word game script where every last letter counts.",
+      "version": "v1.0",
+      "status": "maintenance",
+      "isFree": true,
+      "thumbnail": "/img/indo-place.png",
+      "gameUrl": "https://www.roblox.com/games/ZZZZZZZZ/Indo-Place"
+    },
+    {
+      "id": "indo-ocean",
+      "name": "Indo Ocean",
+      "description": "Word game script where every last letter counts.",
+      "version": "v1.0",
+      "status": "maintenance",
+      "isFree": true,
+      "thumbnail": "/img/indo-ocean.png",
+      "gameUrl": "https://www.roblox.com/games/ZZZZZZZZ/Indo-Ocean"
+    },
+    {
+      "id": "violance-district",
+      "name": "Violance District",
+      "description": "Under maintenance.",
+      "version": "v1.0.0",
+      "status": "maintenance",
+      "isFree": true,
+      "thumbnail": "/img/violance-district.png",
+      "gameUrl": "https://www.roblox.com/games/ZZZZZZZZ/Violance-District"
+    }
+  ]
+}

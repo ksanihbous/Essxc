@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Scripts - <%= siteConfig.siteName %></title>
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body class="bg-grid">
+<header class="nav">
+  <div class="nav-left">
+    <img src="/img/logo-exhub.png" class="logo">
+    <span class="nav-title"><%= siteConfig.siteName %></span>
+  </div>
+  <nav class="nav-links">
+    <a href="/">Home</a>
+    <a href="/get-key">Get Key</a>
+    <a href="/scripts" class="active">Scripts</a>
+    <% if (user) { %>
+      <a href="/dashboard">Dashboard</a>
+      <a href="/logout">Logout</a>
+    <% } else { %>
+      <a href="/login">Login</a>
+    <% } %>
+  </nav>
+</header>
+
+<main class="content">
+  <section class="section">
+    <h1>Supported Games</h1>
+    <p class="muted">Browse our collection of premium scripts for popular Roblox games.</p>
+
+    <div class="scripts-grid">
+      <% scripts.forEach(function(s){ %>
+        <div class="card script-card">
+          <div class="thumb-wrapper">
+            <img src="<%= s.thumbnail %>" class="thumb">
+            <span class="badge badge-version"><%= s.version %></span>
+          </div>
+          <h3><%= s.name %></h3>
+          <p class="muted"><%= s.description %></p>
+
+          <div class="script-meta">
+            <span class="badge <%= s.status === 'working' ? 'badge-active' : 'badge-expired' %>">
+              <%= s.status === 'working' ? 'Working' : 'Maintenance' %>
+            </span>
+            <% if (s.isFree) { %>
+              <span class="badge badge-free">Free</span>
+            <% } %>
+          </div>
+
+          <div class="script-actions">
+            <button class="btn btn-xs btn-copy"
+                    data-copy="<%= loader %>">Copy Loader</button>
+            <a href="<%= s.gameUrl %>" target="_blank" class="btn btn-xs btn-outline">Game Link</a>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  </section>
+</main>
+
+<script src="/js/protect.js"></script>
+</body>
+</html>

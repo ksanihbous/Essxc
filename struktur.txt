@@ -1,0 +1,29 @@
+exc-webs/
+├─ server.js
+├─ package.json
+├─ config/
+│  └─ loader.json
+├─ views/
+│  ├─ home.ejs
+│  ├─ dashboarddc.ejs
+│  ├─ scripts.ejs
+│  ├─ api-404.ejs
+│  ├─ logindc-required.ejs
+│  ├─ discord-login.ejs
+│  ├─ get-key.ejs
+│  └─ admin-dashboard.ejs
+├─ public/
+│  ├─ css/
+│  │  └─ main.css
+│  ├─ js/
+│  │  └─ protect.js
+│  └─ img/
+│     ├─ logo-exhub.png
+│     ├─ logo-discord.png
+│     ├─ logo-linkvertise.png
+│     ├─ logo-workink.png
+│     ├─ spear-fishing.jpg
+│     ├─ indo-hangout.png
+│     └─ indo-beach.png
+└─ scripts/
+   └─ loader.lua

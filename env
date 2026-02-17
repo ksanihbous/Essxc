@@ -1,0 +1,17 @@
+PORT=3000
+BASE_URL=https://exc-webs.vercel.app
+
+DISCORD_CLIENT_ID=xxxxxxxx
+DISCORD_CLIENT_SECRET=xxxxxxxx
+DISCORD_REDIRECT_URI=https://exc-webs.vercel.app/auth/discord/callback
+
+UPSTASH_REDIS_REST_URL=...
+UPSTASH_REDIS_REST_TOKEN=...
+
+SESSION_SECRET=some-long-random-secret
+KEY_EXPIRE_HOURS=3
+
+WORKINK_URL=https://work.ink/your-link
+LINKVERTISE_URL=https://linkvertise.com/your-link
+
+ADMIN_IDS=123456789012345678,987654321098765432

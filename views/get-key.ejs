@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Get Key - <%= siteConfig.siteName %></title>
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body class="bg-grid">
+<header class="nav">
+  <div class="nav-left">
+    <img src="/img/logo-exhub.png" class="logo">
+    <span class="nav-title"><%= siteConfig.siteName %></span>
+  </div>
+  <nav class="nav-links">
+    <a href="/">Home</a>
+    <a href="/get-key" class="active">Get Key</a>
+    <a href="/scripts">Scripts</a>
+    <a href="/dashboard">Dashboard</a>
+    <a href="/logout">Logout</a>
+  </nav>
+</header>
+
+<main class="content">
+  <% if (!provider) { %>
+    <section class="section">
+      <h1>Choose Provider</h1>
+      <p>Select a provider to get your free key.</p>
+
+      <div class="provider-grid">
+        <div class="card provider-card">
+          <div class="provider-header">
+            <img src="/img/logo-linkvertise.png" class="provider-logo">
+            <div>
+              <h3>Premium</h3>
+              <span class="badge badge-paid">Paid</span>
+            </div>
+          </div>
+          <p>Use Linkvertise premium routes with no ads and longer key duration.</p>
+          <a href="/get-key?provider=linkvertise" class="btn btn-primary wide">Select</a>
+        </div>
+
+        <div class="card provider-card">
+          <div class="provider-header">
+            <img src="/img/logo-workink.png" class="provider-logo">
+            <div>
+              <h3>Work.ink</h3>
+              <span class="badge badge-free">Free</span>
+            </div>
+          </div>
+          <p>Complete a short task and get rewarded with a free key.</p>
+          <a href="/get-key?provider=workink" class="btn btn-primary wide">Select</a>
+        </div>
+      </div>
+    </section>
+  <% } else { %>
+
+    <section class="section">
+      <h1>Complete Verification</h1>
+      <p>Complete a quick verification on <strong><%= provider === 'workink' ? 'Work.ink' : 'Linkvertise' %></strong>
+        to get your key and start using our scripts.</p>
+
+      <div class="verification-layout">
+        <div class="card verification-main">
+          <div class="verification-header">
+            <div class="provider-header">
+              <img src="/img/<%= provider === 'workink' ? 'logo-workink.png' : 'logo-linkvertise.png' %>" class="provider-logo">
+              <div>
+                <h3><%= provider === 'workink' ? 'Work.ink' : 'Linkvertise' %></h3>
+                <p class="muted">Complete a short task and return here.</p>
+              </div>
+            </div>
+            <div class="verification-progress">
+              <span>Progress</span>
+              <span><%= sessionCompleted ? '1/1' : '0/1' %></span>
+            </div>
+          </div>
+
+          <div class="verification-actions">
+            <a href="/provider/start?provider=<%= provider %>" class="btn btn-primary">
+              Start
+            </a>
+            <% if (!sessionCompleted) { %>
+              <p class="muted small">After finishing the task, you will be redirected back here automatically.</p>
+            <% } else { %>
+              <p class="success small">Session active – you can now generate a new key.</p>
+            <% } %>
+          </div>
+
+          <form method="POST" action="/get-key/generate">
+            <input type="hidden" name="provider" value="<%= provider %>">
+            <button type="submit" class="btn btn-accent" <%= sessionCompleted ? '' : 'disabled' %>>
+              Generate New Key
+            </button>
+          </form>
+        </div>
+
+        <div class="card verification-keys">
+          <h3>Your Keys</h3>
+          <% if (!keys.length) { %>
+            <p class="muted">No keys yet. Complete verification and generate your first key.</p>
+          <% } else { %>
+            <table class="keys-table">
+              <thead>
+                <tr>
+                  <th>Key</th>
+                  <th>Time Left</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+              <% keys.forEach(function(k){ %>
+                <tr id="key-<%= k.key %>">
+                  <td class="mono"><%= k.key %></td>
+                  <td><%= k.timeLeft %></td>
+                  <td>
+                    <% if (k.isExpired) { %>
+                      <span class="badge badge-expired">Expired</span>
+                    <% } else { %>
+                      <span class="badge badge-active">Active</span>
+                    <% } %>
+                  </td>
+                  <td>
+                    <button class="btn btn-xs btn-copy"
+                            data-copy="<%= k.key %>">Copy</button>
+                    <form method="POST"
+                          action="/keys/<%= k.key %>/extend"
+                          class="inline">
+                      <input type="hidden" name="hours" value="3">
+                      <button class="btn btn-xs">Extend +3h</button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+              </tbody>
+            </table>
+          <% } %>
+        </div>
+      </div>
+    </section>
+  <% } %>
+</main>
+
+<script src="/js/protect.js"></script>
+</body>
+</html>

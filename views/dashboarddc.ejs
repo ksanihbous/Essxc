@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard - <%= siteConfig.siteName %></title>
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body class="bg-grid">
+<header class="nav">
+  <div class="nav-left">
+    <img src="/img/logo-exhub.png" class="logo">
+    <span class="nav-title"><%= siteConfig.siteName %></span>
+  </div>
+  <nav class="nav-links">
+    <a href="/">Home</a>
+    <a href="/get-key">Get Key</a>
+    <a href="/scripts">Scripts</a>
+    <a href="/dashboard" class="active">Dashboard</a>
+    <a href="/logout">Logout</a>
+  </nav>
+</header>
+
+<main class="content">
+  <section class="section">
+    <div class="profile-header">
+      <% if (user && user.avatar) { %>
+        <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png?size=256"
+             class="avatar-lg">
+      <% } else { %>
+        <div class="avatar-placeholder"><%= (user.global_name || user.username)[0] %></div>
+      <% } %>
+      <div>
+        <h1>Welcome back, <span class="accent"><%= user.global_name || user.username %></span></h1>
+        <p class="muted">Manage your license keys and access to scripts.</p>
+      </div>
+    </div>
+
+    <div class="dashboard-stats">
+      <div class="card stat-card">
+        <span class="stat-label">Total Keys</span>
+        <span class="stat-value"><%= summary.totalKeys %></span>
+      </div>
+      <div class="card stat-card">
+        <span class="stat-label">Active Keys</span>
+        <span class="stat-value"><%= summary.activeKeys %></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3>Your Keys</h3>
+        <a href="/get-key" class="btn btn-xs">Get New Key</a>
+      </div>
+
+      <% if (!keys.length) { %>
+        <p class="muted">You don't have any keys yet.</p>
+      <% } else { %>
+        <table class="keys-table">
+          <thead>
+          <tr>
+            <th>Key</th>
+            <th>Provider</th>
+            <th>Created</th>
+            <th>Expires</th>
+            <th>Status</th>
+          </tr>
+          </thead>
+          <tbody>
+          <% keys.forEach(function(k){ %>
+            <tr>
+              <td class="mono"><%= k.key %></td>
+              <td><%= k.provider %></td>
+              <td><%= new Date(k.createdAt).toLocaleString() %></td>
+              <td><%= new Date(k.expiresAfter).toLocaleString() %></td>
+              <td>
+                <% if (k.expiresAfter <= Date.now() || k.status !== 'active') { %>
+                  <span class="badge badge-expired">Expired</span>
+                <% } else { %>
+                  <span class="badge badge-active">Active</span>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+  </section>
+</main>
+
+<script src="/js/protect.js"></script>
+</body>
+</html>

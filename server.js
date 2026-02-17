@@ -13,10 +13,24 @@ const fetch = (...args) =>
 
 const app = express();
 
-// === CONFIG & CLIENTS ===
-const siteConfig = JSON.parse(
-  fs.readFileSync(path.join(__dirname, "config/loader.json"), "utf8")
-);
+/* ================================
+   CONFIG & CLIENTS
+================================ */
+
+// load config/loader.json (kalau tidak ada, pakai default)
+let siteConfig = {
+  loader: {},
+  scripts: []
+};
+try {
+  const rawCfg = fs.readFileSync(
+    path.join(__dirname, "config/loader.json"),
+    "utf8"
+  );
+  siteConfig = JSON.parse(rawCfg);
+} catch (err) {
+  console.warn("[WARN] config/loader.json tidak bisa dibaca:", err.message);
+}
 
 // Ambil URL/TOKEN Upstash Redis dari berbagai kemungkinan ENV
 const REDIS_REST_URL =
@@ -37,7 +51,7 @@ if (!REDIS_REST_URL || !REDIS_REST_TOKEN) {
 
 const redis = new Redis({
   url: REDIS_REST_URL,
-  token: REDIS_REST_TOKEN,
+  token: REDIS_REST_TOKEN
 });
 
 const PORT = process.env.PORT || 3000;
@@ -54,7 +68,10 @@ const LINKVERTISE_URL =
 const KEY_EXPIRE_HOURS = Number(process.env.KEY_EXPIRE_HOURS || 3);
 const ADMIN_IDS = (process.env.ADMIN_IDS || "").split(",").filter(Boolean);
 
-// === EXPRESS SETUP ===
+/* ================================
+   EXPRESS SETUP
+================================ */
+
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
@@ -65,12 +82,13 @@ app.use(cookieParser());
 // Static file: mendukung /img/*.png /img/*.jpg /css /js dll
 app.use(express.static(path.join(__dirname, "public")));
 
-// === FAVICON HANDLER (menghindari 404 favicon.ico) ===
-//
-// - Browser SELALU minta /favicon.ico
-// - Di sini kita coba kirim public/img/logo-exhub.png atau .jpg
-// - Kalau tidak ada, balas 204 No Content (tidak error 404 di log)
-app.get("/favicon.ico", (req, res) => {
+/* ===== FAVICON HANDLER =====
+   - Browser SELALU minta /favicon.ico dan kadang /favicon.png
+   - Di sini kita coba kirim public/img/logo-exhub.png atau .jpg
+   - Kalau tidak ada, balas 204 No Content (tidak 404 & tidak 500)
+*/
+
+function sendLogoAsFavicon(req, res) {
   try {
     const pngPath = path.join(__dirname, "public", "img", "logo-exhub.png");
     const jpgPath = path.join(__dirname, "public", "img", "logo-exhub.jpg");
@@ -82,15 +100,18 @@ app.get("/favicon.ico", (req, res) => {
       return res.sendFile(jpgPath);
     }
 
-    // Tidak ada favicon, tapi kita balas 204 agar tidak 404 spam
-    return res.status(204).end();
+    return res.status(204).end(); // tidak ada favicon, tapi bukan error
   } catch (err) {
-    // Kalau ada error baca file, tetap jangan bikin 500
     return res.status(204).end();
   }
-});
+}
 
-// === HELPER FUNCTIONS ===
+app.get("/favicon.ico", sendLogoAsFavicon);
+app.get("/favicon.png", sendLogoAsFavicon);
+
+/* ================================
+   HELPER FUNCTIONS
+================================ */
 
 function getIp(req) {
   const raw = req.headers["x-forwarded-for"] || req.socket.remoteAddress || "";
@@ -154,7 +175,10 @@ async function setScripts(list) {
   await redis.set("scripts", JSON.stringify(list));
 }
 
-// JWT session <-> req.user
+/* ================================
+   JWT session <-> req.user
+================================ */
+
 app.use((req, res, next) => {
   const token = req.cookies.session;
   if (!token) {
@@ -184,9 +208,10 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// === DISCORD OAUTH ===
+/* ================================
+   DISCORD OAUTH
+================================ */
 
-// tombol login
 app.get("/login", (req, res) => {
   res.render("discord-login", { siteConfig });
 });
@@ -205,7 +230,7 @@ app.get("/auth/discord", (req, res) => {
     client_id: DISCORD_CLIENT_ID,
     redirect_uri: DISCORD_REDIRECT_URI,
     response_type: "code",
-    scope: "identify email guilds guilds.join",
+    scope: "identify email guilds guilds.join"
   });
   res.redirect(
     "https://discord.com/api/oauth2/authorize?" + params.toString()
@@ -217,19 +242,18 @@ app.get("/auth/discord/callback", async (req, res) => {
   if (!code) return res.redirect("/login");
 
   try {
-    // exchange code
     const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
       method: "POST",
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Type": "application/x-www-form-urlencoded"
       },
       body: new URLSearchParams({
         client_id: DISCORD_CLIENT_ID,
         client_secret: DISCORD_CLIENT_SECRET,
         grant_type: "authorization_code",
         code,
-        redirect_uri: DISCORD_REDIRECT_URI,
-      }),
+        redirect_uri: DISCORD_REDIRECT_URI
+      })
     });
 
     const tokenData = await tokenRes.json();
@@ -238,31 +262,28 @@ app.get("/auth/discord/callback", async (req, res) => {
       return res.redirect("/login");
     }
 
-    // get user info
     const userRes = await fetch("https://discord.com/api/users/@me", {
       headers: {
-        Authorization: `Bearer ${tokenData.access_token}`,
-      },
+        Authorization: `Bearer ${tokenData.access_token}`
+      }
     });
     const user = await userRes.json();
-
-    // (optional) check guild membership, invite, dll kalau perlu
 
     const payload = {
       id: user.id,
       username: user.username,
       global_name: user.global_name || user.username,
-      avatar: user.avatar,
+      avatar: user.avatar
     };
 
     const jwtToken = jwt.sign(payload, SESSION_SECRET, {
-      expiresIn: "7d",
+      expiresIn: "7d"
     });
 
     res.cookie("session", jwtToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      sameSite: "lax"
     });
 
     res.redirect("/dashboard");
@@ -272,7 +293,9 @@ app.get("/auth/discord/callback", async (req, res) => {
   }
 });
 
-// === ROUTES PUBLIC ===
+/* ================================
+   ROUTES PUBLIC
+================================ */
 
 // Home (TAB 1)
 app.get("/", async (req, res) => {
@@ -287,7 +310,7 @@ app.get("/", async (req, res) => {
 
   res.render("home", {
     siteConfig,
-    stats: { totalKeys, activeKeys },
+    stats: { totalKeys, activeKeys }
   });
 });
 
@@ -305,8 +328,8 @@ app.get("/dashboard", requireAuth, async (req, res) => {
     keys,
     summary: {
       totalKeys,
-      activeKeys: active,
-    },
+      activeKeys: active
+    }
   });
 });
 
@@ -316,11 +339,13 @@ app.get("/scripts", async (req, res) => {
   res.render("scripts", {
     siteConfig,
     scripts,
-    loader: siteConfig.loader,
+    loader: siteConfig.loader
   });
 });
 
-// === GET KEY FLOW (TAB 2) ===
+/* ================================
+   GET KEY FLOW (TAB 2)
+================================ */
 
 app.get("/get-key", requireAuth, async (req, res) => {
   const provider = req.query.provider || null;
@@ -330,12 +355,14 @@ app.get("/get-key", requireAuth, async (req, res) => {
   const keysWithTime = keys.map((k) => ({
     ...k,
     timeLeft: msToTime(k.expiresAfter - now),
-    isExpired: k.expiresAfter <= now || k.status !== "active",
+    isExpired: k.expiresAfter <= now || k.status !== "active"
   }));
 
   let sessionCompleted = false;
   if (provider) {
-    const flag = await redis.get(`session-complete:${req.user.id}:${provider}`);
+    const flag = await redis.get(
+      `session-complete:${req.user.id}:${provider}`
+    );
     sessionCompleted = Boolean(flag);
   }
 
@@ -343,7 +370,7 @@ app.get("/get-key", requireAuth, async (req, res) => {
     siteConfig,
     provider,
     keys: keysWithTime,
-    sessionCompleted,
+    sessionCompleted
   });
 });
 
@@ -369,9 +396,9 @@ app.get("/provider/start", requireAuth, async (req, res) => {
   res.redirect(externalUrl);
 });
 
-// Callback setelah user selesai dari provider
-// di Work.ink/Linkvertise redirect ke:
-// https://exc-webs.vercel.app/provider/callback?provider=workink&sid={sid}
+// Callback dari provider
+// Contoh redirect di Work.ink/Linkvertise:
+//   https://exc-webss.vercel.app/provider/callback?provider=workink&sid={sid}
 app.get("/provider/callback", async (req, res) => {
   const { provider, sid } = req.query;
   if (!provider || !sid) return res.redirect("/get-key");
@@ -384,7 +411,7 @@ app.get("/provider/callback", async (req, res) => {
   await redis.del(`session:${sid}`);
 
   await redis.set(`session-complete:${data.discordId}:${provider}`, "1", {
-    ex: 600, // 10 menit untuk generate key
+    ex: 600 // 10 menit untuk generate key
   });
 
   res.redirect(`/get-key?provider=${provider}`);
@@ -418,7 +445,7 @@ app.post("/get-key/generate", requireAuth, async (req, res) => {
     expiresAfter,
     status: "active",
     byIp: null,
-    hwid: null,
+    hwid: null
   };
 
   await saveKeyRecord(record);
@@ -427,7 +454,7 @@ app.post("/get-key/generate", requireAuth, async (req, res) => {
   res.redirect(`/get-key?provider=${provider}#key-${key}`);
 });
 
-// Extend / Renew key (simple)
+// Extend / Renew key
 app.post("/keys/:key/extend", requireAuth, async (req, res) => {
   const key = req.params.key;
   const hours = Number(req.body.hours || KEY_EXPIRE_HOURS);
@@ -445,7 +472,9 @@ app.post("/keys/:key/extend", requireAuth, async (req, res) => {
   res.redirect("/get-key");
 });
 
-// === ADMIN DASHBOARD ===
+/* ================================
+   ADMIN DASHBOARD
+================================ */
 
 app.get("/admin", requireAdmin, async (req, res) => {
   const scripts = await getScripts();
@@ -455,7 +484,7 @@ app.get("/admin", requireAdmin, async (req, res) => {
   res.render("admin-dashboard", {
     siteConfig,
     scripts,
-    stats: { totalKeys, activeKeys },
+    stats: { totalKeys, activeKeys }
   });
 });
 
@@ -480,7 +509,7 @@ app.post("/admin/scripts", requireAdmin, async (req, res) => {
     status,
     thumbnail,
     gameUrl,
-    isFree: !!isFree,
+    isFree: !!isFree
   };
 
   if (existingIndex >= 0) {
@@ -493,7 +522,9 @@ app.post("/admin/scripts", requireAdmin, async (req, res) => {
   res.redirect("/admin");
 });
 
-// === API UNTUK LOADER LUA ===
+/* ================================
+   API UNTUK LOADER LUA
+================================ */
 
 // Endpoint loader (hanya bisa diakses dari HttpService Roblox)
 app.get("/api/script/loader", (req, res) => {
@@ -510,16 +541,7 @@ app.get("/api/script/loader", (req, res) => {
   res.send(fs.readFileSync(filePath, "utf8"));
 });
 
-// === API SIMPLE UNTUK VALIDASI KEY (TANPA HWID / USER BIND) ===
-//
-// Dipakai oleh loader.lua:
-//   GET /api/isValidate/:key
-// Response contoh sukses:
-//   { valid: true, deleted: false, message: "OK",
-//     info: { key, createdAt, expiresAfter, provider, discordId, byIp } }
-//
-// Response key tidak ada / expired:
-//   { valid: false, deleted: false, message: "Key not found" / "Key expired" }
+// API simple validasi key (tanpa HWID / bind user)
 app.get("/api/isValidate/:key", async (req, res) => {
   const key = req.params.key;
   const ip = getIp(req);
@@ -529,14 +551,13 @@ app.get("/api/isValidate/:key", async (req, res) => {
     return res.json({
       valid: false,
       deleted: false,
-      message: "Key not found",
+      message: "Key not found"
     });
   }
 
   const data = JSON.parse(raw);
   const now = Date.now();
 
-  // Kalau ada masa berlaku, cek expired
   if (data.expiresAfter && data.expiresAfter <= now) {
     data.status = "expired";
     await redis.set(`key:${key}`, JSON.stringify(data));
@@ -544,11 +565,10 @@ app.get("/api/isValidate/:key", async (req, res) => {
     return res.json({
       valid: false,
       deleted: false,
-      message: "Key expired",
+      message: "Key expired"
     });
   }
 
-  // Key valid, tidak ada binding apa-apa
   return res.json({
     valid: true,
     deleted: false,
@@ -557,21 +577,25 @@ app.get("/api/isValidate/:key", async (req, res) => {
       key: data.key,
       createdAt: data.createdAt || null,
       expiresAfter: data.expiresAfter || null,
-
-      // info tambahan (hanya untuk UI / log, tidak dipakai nge-lock)
       provider: data.provider || null,
       discordId: data.discordId || null,
-      byIp: data.byIp || ip,
-    },
+      byIp: data.byIp || ip
+    }
   });
 });
 
-// 404 default
+/* ================================
+   404 DEFAULT
+================================ */
+
 app.use((req, res) => {
   res.status(404).render("api-404", { siteConfig });
 });
 
-// START
+/* ================================
+   START
+================================ */
+
 app.listen(PORT, () => {
   console.log("EXC Webs running on port", PORT);
 });

@@ -1,5 +1,4 @@
 require("dotenv").config();
-
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
@@ -19,9 +18,26 @@ const siteConfig = JSON.parse(
   fs.readFileSync(path.join(__dirname, "config/loader.json"), "utf8")
 );
 
+// Ambil URL/TOKEN Upstash Redis dari berbagai kemungkinan ENV
+const REDIS_REST_URL =
+  process.env.UPSTASH_REDIS_REST_URL ||
+  process.env.KV_REST_API_URL ||
+  process.env.kv_KV_REST_API_URL;
+
+const REDIS_REST_TOKEN =
+  process.env.UPSTASH_REDIS_REST_TOKEN ||
+  process.env.KV_REST_API_TOKEN ||
+  process.env.kv_KV_REST_API_TOKEN;
+
+if (!REDIS_REST_URL || !REDIS_REST_TOKEN) {
+  console.warn(
+    "[WARN] Upstash Redis ENV tidak lengkap (URL/TOKEN). Pastikan sudah set di Vercel / .env"
+  );
+}
+
 const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN
+  url: REDIS_REST_URL,
+  token: REDIS_REST_TOKEN,
 });
 
 const PORT = process.env.PORT || 3000;
@@ -30,8 +46,7 @@ const SESSION_SECRET = process.env.SESSION_SECRET || "dev-secret";
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 const DISCORD_REDIRECT_URI =
-  process.env.DISCORD_REDIRECT_URI ||
-  BASE_URL + "/auth/discord/callback";
+  process.env.DISCORD_REDIRECT_URI || BASE_URL + "/auth/discord/callback";
 const REQUIRED_GUILD_ID = process.env.REQUIRED_GUILD_ID || null;
 const WORKINK_URL = process.env.WORKINK_URL || "https://work.ink/your-link";
 const LINKVERTISE_URL =
@@ -46,7 +61,34 @@ app.set("views", path.join(__dirname, "views"));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser());
+
+// Static file: mendukung /img/*.png /img/*.jpg /css /js dll
 app.use(express.static(path.join(__dirname, "public")));
+
+// === FAVICON HANDLER (menghindari 404 favicon.ico) ===
+//
+// - Browser SELALU minta /favicon.ico
+// - Di sini kita coba kirim public/img/logo-exhub.png atau .jpg
+// - Kalau tidak ada, balas 204 No Content (tidak error 404 di log)
+app.get("/favicon.ico", (req, res) => {
+  try {
+    const pngPath = path.join(__dirname, "public", "img", "logo-exhub.png");
+    const jpgPath = path.join(__dirname, "public", "img", "logo-exhub.jpg");
+
+    if (fs.existsSync(pngPath)) {
+      return res.sendFile(pngPath);
+    }
+    if (fs.existsSync(jpgPath)) {
+      return res.sendFile(jpgPath);
+    }
+
+    // Tidak ada favicon, tapi kita balas 204 agar tidak 404 spam
+    return res.status(204).end();
+  } catch (err) {
+    // Kalau ada error baca file, tetap jangan bikin 500
+    return res.status(204).end();
+  }
+});
 
 // === HELPER FUNCTIONS ===
 
@@ -95,9 +137,7 @@ async function updateKeyRecord(key, updater) {
 async function getUserKeys(discordId) {
   const keys = (await redis.smembers(`user:${discordId}:keys`)) || [];
   if (!keys.length) return [];
-  const results = await Promise.all(
-    keys.map((k) => redis.get(`key:${k}`))
-  );
+  const results = await Promise.all(keys.map((k) => redis.get(`key:${k}`)));
   return results
     .filter(Boolean)
     .map((raw) => JSON.parse(raw))
@@ -165,9 +205,11 @@ app.get("/auth/discord", (req, res) => {
     client_id: DISCORD_CLIENT_ID,
     redirect_uri: DISCORD_REDIRECT_URI,
     response_type: "code",
-    scope: "identify email guilds guilds.join"
+    scope: "identify email guilds guilds.join",
   });
-  res.redirect("https://discord.com/api/oauth2/authorize?" + params.toString());
+  res.redirect(
+    "https://discord.com/api/oauth2/authorize?" + params.toString()
+  );
 });
 
 app.get("/auth/discord/callback", async (req, res) => {
@@ -179,15 +221,15 @@ app.get("/auth/discord/callback", async (req, res) => {
     const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
       method: "POST",
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
+        "Content-Type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams({
         client_id: DISCORD_CLIENT_ID,
         client_secret: DISCORD_CLIENT_SECRET,
         grant_type: "authorization_code",
         code,
-        redirect_uri: DISCORD_REDIRECT_URI
-      })
+        redirect_uri: DISCORD_REDIRECT_URI,
+      }),
     });
 
     const tokenData = await tokenRes.json();
@@ -199,8 +241,8 @@ app.get("/auth/discord/callback", async (req, res) => {
     // get user info
     const userRes = await fetch("https://discord.com/api/users/@me", {
       headers: {
-        Authorization: `Bearer ${tokenData.access_token}`
-      }
+        Authorization: `Bearer ${tokenData.access_token}`,
+      },
     });
     const user = await userRes.json();
 
@@ -210,17 +252,17 @@ app.get("/auth/discord/callback", async (req, res) => {
       id: user.id,
       username: user.username,
       global_name: user.global_name || user.username,
-      avatar: user.avatar
+      avatar: user.avatar,
     };
 
     const jwtToken = jwt.sign(payload, SESSION_SECRET, {
-      expiresIn: "7d"
+      expiresIn: "7d",
     });
 
     res.cookie("session", jwtToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax"
+      sameSite: "lax",
     });
 
     res.redirect("/dashboard");
@@ -245,11 +287,11 @@ app.get("/", async (req, res) => {
 
   res.render("home", {
     siteConfig,
-    stats: { totalKeys, activeKeys }
+    stats: { totalKeys, activeKeys },
   });
 });
 
-// Dashboard user (seperti Gbr 8)
+// Dashboard user
 app.get("/dashboard", requireAuth, async (req, res) => {
   const keys = await getUserKeys(req.user.id);
   const now = Date.now();
@@ -263,8 +305,8 @@ app.get("/dashboard", requireAuth, async (req, res) => {
     keys,
     summary: {
       totalKeys,
-      activeKeys: active
-    }
+      activeKeys: active,
+    },
   });
 });
 
@@ -274,7 +316,7 @@ app.get("/scripts", async (req, res) => {
   res.render("scripts", {
     siteConfig,
     scripts,
-    loader: siteConfig.loader
+    loader: siteConfig.loader,
   });
 });
 
@@ -288,14 +330,12 @@ app.get("/get-key", requireAuth, async (req, res) => {
   const keysWithTime = keys.map((k) => ({
     ...k,
     timeLeft: msToTime(k.expiresAfter - now),
-    isExpired: k.expiresAfter <= now || k.status !== "active"
+    isExpired: k.expiresAfter <= now || k.status !== "active",
   }));
 
   let sessionCompleted = false;
   if (provider) {
-    const flag = await redis.get(
-      `session-complete:${req.user.id}:${provider}`
-    );
+    const flag = await redis.get(`session-complete:${req.user.id}:${provider}`);
     sessionCompleted = Boolean(flag);
   }
 
@@ -303,7 +343,7 @@ app.get("/get-key", requireAuth, async (req, res) => {
     siteConfig,
     provider,
     keys: keysWithTime,
-    sessionCompleted
+    sessionCompleted,
   });
 });
 
@@ -343,11 +383,9 @@ app.get("/provider/callback", async (req, res) => {
   const data = JSON.parse(raw);
   await redis.del(`session:${sid}`);
 
-  await redis.set(
-    `session-complete:${data.discordId}:${provider}`,
-    "1",
-    { ex: 600 } // 10 menit untuk generate key
-  );
+  await redis.set(`session-complete:${data.discordId}:${provider}`, "1", {
+    ex: 600, // 10 menit untuk generate key
+  });
 
   res.redirect(`/get-key?provider=${provider}`);
 });
@@ -380,7 +418,7 @@ app.post("/get-key/generate", requireAuth, async (req, res) => {
     expiresAfter,
     status: "active",
     byIp: null,
-    hwid: null
+    hwid: null,
   };
 
   await saveKeyRecord(record);
@@ -389,7 +427,7 @@ app.post("/get-key/generate", requireAuth, async (req, res) => {
   res.redirect(`/get-key?provider=${provider}#key-${key}`);
 });
 
-// Extend / Renew key (hanya contoh simple)
+// Extend / Renew key (simple)
 app.post("/keys/:key/extend", requireAuth, async (req, res) => {
   const key = req.params.key;
   const hours = Number(req.body.hours || KEY_EXPIRE_HOURS);
@@ -417,7 +455,7 @@ app.get("/admin", requireAdmin, async (req, res) => {
   res.render("admin-dashboard", {
     siteConfig,
     scripts,
-    stats: { totalKeys, activeKeys }
+    stats: { totalKeys, activeKeys },
   });
 });
 
@@ -442,7 +480,7 @@ app.post("/admin/scripts", requireAdmin, async (req, res) => {
     status,
     thumbnail,
     gameUrl,
-    isFree: !!isFree
+    isFree: !!isFree,
   };
 
   if (existingIndex >= 0) {
@@ -472,10 +510,18 @@ app.get("/api/script/loader", (req, res) => {
   res.send(fs.readFileSync(filePath, "utf8"));
 });
 
-// Endpoint validasi key (dipanggil dari loader.lua)
+// === API SIMPLE UNTUK VALIDASI KEY (TANPA HWID / USER BIND) ===
+//
+// Dipakai oleh loader.lua:
+//   GET /api/isValidate/:key
+// Response contoh sukses:
+//   { valid: true, deleted: false, message: "OK",
+//     info: { key, createdAt, expiresAfter, provider, discordId, byIp } }
+//
+// Response key tidak ada / expired:
+//   { valid: false, deleted: false, message: "Key not found" / "Key expired" }
 app.get("/api/isValidate/:key", async (req, res) => {
   const key = req.params.key;
-  const hwid = req.query.hwid || null;
   const ip = getIp(req);
 
   const raw = await redis.get(`key:${key}`);
@@ -483,51 +529,41 @@ app.get("/api/isValidate/:key", async (req, res) => {
     return res.json({
       valid: false,
       deleted: false,
-      info: null
+      message: "Key not found",
     });
   }
 
-  let data = JSON.parse(raw);
+  const data = JSON.parse(raw);
   const now = Date.now();
 
-  if (data.expiresAfter <= now) {
+  // Kalau ada masa berlaku, cek expired
+  if (data.expiresAfter && data.expiresAfter <= now) {
     data.status = "expired";
     await redis.set(`key:${key}`, JSON.stringify(data));
+
     return res.json({
       valid: false,
       deleted: false,
-      info: null
+      message: "Key expired",
     });
   }
 
-  // HWID locking
-  if (!data.hwid && hwid) {
-    data.hwid = hwid;
-    data.byIp = ip;
-    await redis.set(`key:${key}`, JSON.stringify(data));
-  } else if (data.hwid && hwid && data.hwid !== hwid) {
-    // HWID beda -> invalid
-    return res.json({
-      valid: false,
-      deleted: true,
-      info: null
-    });
-  }
-
-  const response = {
+  // Key valid, tidak ada binding apa-apa
+  return res.json({
     valid: true,
     deleted: false,
+    message: "OK",
     info: {
-      token: data.key,
-      createdAt: data.createdAt,
-      byIp: data.byIp || ip,
-      linkId: data.provider || null,
-      userId: data.discordId,
-      expiresAfter: data.expiresAfter
-    }
-  };
+      key: data.key,
+      createdAt: data.createdAt || null,
+      expiresAfter: data.expiresAfter || null,
 
-  res.json(response);
+      // info tambahan (hanya untuk UI / log, tidak dipakai nge-lock)
+      provider: data.provider || null,
+      discordId: data.discordId || null,
+      byIp: data.byIp || ip,
+    },
+  });
 });
 
 // 404 default

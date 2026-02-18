@@ -7,6 +7,7 @@ const fs = require("fs");
 const axios = require("axios");
 const cookieSession = require("cookie-session");
 const { Redis } = require("@upstash/redis");
+const cookieSession = require("cookie-session");
 
 const app = express();
 

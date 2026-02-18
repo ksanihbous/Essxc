@@ -1,20 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Login Required - <%= siteConfig.siteName %></title>
-  <link rel="stylesheet" href="/css/main.css">
+  <meta charset="UTF-8" />
+  <title>Login Required - <%= siteName %></title>
+  <link rel="stylesheet" href="/public/css/main.css" />
+  <script src="/public/js/protect.js" defer></script>
 </head>
-<body class="bg-grid center-page">
+<body class="page-dark">
+<div class="center-wrap">
   <div class="card">
-    <h2>Login Required</h2>
-    <p>Please login with Discord first to continue.</p>
-    <a href="/auth/discord" class="btn btn-discord wide">
-      <img src="/img/logo-discord.png" class="icon-sm">
+    <h1>Login Required</h1>
+    <p>You must login with Discord before using the key system.</p>
+    <a
+      href="/auth/discord?<%= new URLSearchParams({ next: redirectTo || '/get-key?provider=workink' }).toString() %>"
+      class="btn btn-discord btn-full"
+    >
       Login with Discord
     </a>
-    <a href="/" class="link-muted">← Back to Home</a>
   </div>
-  <script src="/js/protect.js"></script>
+</div>
 </body>
 </html>

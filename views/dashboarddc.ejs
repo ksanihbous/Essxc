@@ -10,37 +10,41 @@
   <%- include('partials/nav', { active: 'dashboard' }) %>
 
   <main class="container">
+    <!-- HEADER USER + STATS -->
     <section class="page-header dashboard-header">
       <div class="user-info">
         <img
           class="avatar"
           src="<%= user && user.avatar
-                  ? 'https://cdn.discordapp.com/avatars/' + user.id + '/' + user.avatar + '.png'
-                  : '/public/img/logo-exhub.png' %>"
+                ? 'https://cdn.discordapp.com/avatars/' + user.id + '/' + user.avatar + '.png'
+                : '/public/img/logo-exhub.png' %>"
           alt="avatar"
         />
         <div>
-          <h1>Welcome back, <%= user.global_name || user.username %></h1>
-          <p>ID: <code><%= user.id %></code></p>
+          <h1>Welcome back, <%= (user && (user.global_name || user.username)) || 'User' %></h1>
+          <% if (user && user.id) { %>
+            <p>ID: <code><%= user.id %></code></p>
+          <% } %>
         </div>
       </div>
 
       <div class="stats-row">
         <div class="stat-card">
           <span class="stat-label">Total Keys</span>
-          <span class="stat-value"><%= stats.totalKeys %></span>
+          <span class="stat-value"><%= (stats && stats.totalKeys) || 0 %></span>
         </div>
         <div class="stat-card">
           <span class="stat-label">Active Keys</span>
-          <span class="stat-value"><%= stats.activeKeys %></span>
+          <span class="stat-value"><%= (stats && stats.activeKeys) || 0 %></span>
         </div>
         <div class="stat-card">
           <span class="stat-label">Premium Keys</span>
-          <span class="stat-value"><%= stats.premiumKeys %></span>
+          <span class="stat-value"><%= (stats && stats.premiumKeys) || 0 %></span>
         </div>
       </div>
     </section>
 
+    <!-- LIST KEY -->
     <section class="card">
       <div class="card-header-row">
         <h2>Your Keys</h2>
@@ -65,9 +69,10 @@
             </tr>
           </thead>
           <tbody>
-            <% keys.forEach(function(k) {
-                 const isExpired = !k.expiresAfter || k.expiresAfter <= Date.now() || k.deleted;
-                 const status = isExpired ? 'Expired' : 'Active';
+            <% const now = Date.now(); %>
+            <% keys.forEach(function(k) { 
+                 const expired = k.deleted || (k.expiresAfter && k.expiresAfter <= now);
+                 const status = expired ? 'Expired' : 'Active';
             %>
               <tr>
                 <td><code class="mono"><%= k.token %></code></td>
@@ -100,7 +105,7 @@
   <footer class="footer">
     <span>
       Dashboard connected to Discord account:
-      <strong><%= user.username %></strong>
+      <strong><%= (user && user.username) || 'Unknown' %></strong>
     </span>
   </footer>
 </body>

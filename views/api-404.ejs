@@ -1,16 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>404 - <%= siteConfig.siteName %></title>
-  <link rel="stylesheet" href="/css/main.css">
+  <meta charset="UTF-8" />
+  <title>404 - <%= siteName %></title>
+  <link rel="stylesheet" href="/public/css/main.css" />
 </head>
-<body class="bg-grid center-page">
-  <div class="card">
-    <h2>404 Not Found</h2>
-    <p class="muted">The resource you're looking for does not exist.</p>
-    <a href="/" class="btn btn-outline">Go Home</a>
+<body class="page-dark">
+<div class="center-wrap">
+  <div class="card card-404">
+    <h1>404</h1>
+    <p>This endpoint is only for the Roblox loader.</p>
+    <p class="helper-text">
+      Use the in-game script loader instead of opening this link directly in your browser.
+    </p>
+    <a href="/" class="btn btn-primary">Back to Home</a>
   </div>
-  <script src="/js/protect.js"></script>
+</div>
 </body>
 </html>

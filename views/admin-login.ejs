@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin Login - <%= siteName %></title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/public/css/main.css" />
+  <script src="/public/js/protect.js" defer></script>
+</head>
+<body class="page-dark">
+
+  <% /* optional navbar, kalau kamu pakai partial nav */ %>
+  <%- include('partials/nav', { active: 'admin' }) %>
+
+  <main class="center-wrap">
+    <div class="card" style="max-width: 420px; width: 100%;">
+      <div class="card-header" style="text-align:center; margin-bottom:12px;">
+        <img
+          src="/public/img/logo-exhub.png"
+          alt="logo"
+          style="width:56px;height:56px;border-radius:50%;object-fit:cover;margin-bottom:8px;"
+        />
+        <h1 style="margin:0 0 6px;">Admin Panel Login</h1>
+        <p class="helper-text">
+          This page is restricted. Only staff with admin credentials can access the panel.
+        </p>
+      </div>
+
+      <% if (typeof errorMessage !== 'undefined' && errorMessage) { %>
+        <div class="alert alert-success" style="background:rgba(255,75,106,0.12);border-color:rgba(255,75,106,0.6);color:#ff9aaa;">
+          <strong>Login Failed.</strong> <%= errorMessage %>
+        </div>
+      <% } %>
+
+      <form method="post" action="/admin/login" style="margin-top:12px;">
+        <input type="hidden" name="redirectTo" value="<%= redirectTo || '/admin' %>" />
+
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
+          <label style="font-size:13px;color:var(--text-muted);">
+            Username
+            <input
+              type="text"
+              name="username"
+              required
+              autocomplete="username"
+              style="
+                margin-top:4px;
+                width:100%;
+                padding:8px 10px;
+                border-radius:10px;
+                border:1px solid var(--border-soft);
+                background:#05070f;
+                color:var(--text-main);
+                font-size:13px;
+              "
+              placeholder="Admin username"
+            />
+          </label>
+
+          <label style="font-size:13px;color:var(--text-muted);">
+            Password
+            <input
+              type="password"
+              name="password"
+              required
+              autocomplete="current-password"
+              style="
+                margin-top:4px;
+                width:100%;
+                padding:8px 10px;
+                border-radius:10px;
+                border:1px solid var(--border-soft);
+                background:#05070f;
+                color:var(--text-main);
+                font-size:13px;
+              "
+              placeholder="Admin password"
+            />
+          </label>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-full">
+          Login as Admin
+        </button>
+      </form>
+
+      <p class="helper-text" style="margin-top:10px;font-size:12px;text-align:center;">
+        Credentials are stored securely in server environment variables.
+      </p>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <span>© <%= new Date().getFullYear() %> <%= siteName %> • Admin Area</span>
+  </footer>
+</body>
+</html>

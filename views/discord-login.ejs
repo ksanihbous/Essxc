@@ -2,43 +2,44 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Discord Login - <%= siteName %></title>
+  <title>Discord Login - <%= siteName || 'ExHub' %></title>
   <link rel="stylesheet" href="/public/css/main.css" />
   <script src="/public/js/protect.js" defer></script>
-  <style>
-    .discord-logo-sm {
-      width: 56px;
-      height: 56px;
-      margin-bottom: 12px;
-      border-radius: 16px;
-    }
-    .login-card-title {
-      font-size: 1.6rem;
-      margin-bottom: 4px;
-    }
-  </style>
 </head>
 <body class="page-dark">
-<div class="center-wrap">
-  <div class="card">
-    <div class="card-header">
-      <img src="/public/img/logo-discord.png" class="discord-logo-sm" alt="Discord" />
-      <h1 class="login-card-title">Login with Discord</h1>
-      <p>We use Discord to bind your keys and protect against abuse.</p>
-    </div>
-    <div class="card-body">
-      <a
-        href="/auth/discord?next=<%= encodeURIComponent(nextUrl) %>"
-        class="btn btn-discord btn-full"
-      >
-        Login with Discord
-      </a>
-      <p class="helper-text">
-        After login you will be redirected back to:
-        <code><%= nextUrl %></code>
-      </p>
+  <div class="center-wrap">
+    <div class="card">
+      <div class="card-header">
+        <!-- Logo Discord kecil -->
+        <img
+          src="/public/img/logo-discord.png"
+          class="discord-logo-sm"
+          style="width:64px;height:64px;object-fit:contain;"
+          alt="Discord"
+        />
+        <h1>Login with Discord</h1>
+        <p>We use Discord to bind your keys and protect against abuse.</p>
+      </div>
+
+      <div class="card-body">
+        <% 
+          const targetNext = nextUrl || '/dashboard';
+          const nextParam = 'next=' + encodeURIComponent(targetNext);
+        %>
+
+        <a
+          href="/auth/discord?<%= nextParam %>"
+          class="btn btn-discord btn-full"
+        >
+          Login with Discord
+        </a>
+
+        <p class="helper-text">
+          After login you will be redirected back to:
+          <code><%= targetNext %></code>
+        </p>
+      </div>
     </div>
   </div>
-</div>
 </body>
 </html>

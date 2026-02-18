@@ -42,7 +42,7 @@ const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 const DISCORD_REDIRECT_URI =
   process.env.DISCORD_REDIRECT_URI ||
-  "https://exc-webs.vercel.app/auth/discord/callback"; // default saja (env akan override)
+  "https://exc-webs.vercel.app/auth/discord/callback";
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const DISCORD_GUILD_ID = process.env.DISCORD_GUILD_ID;
 
@@ -205,7 +205,7 @@ function isKeyActive(info) {
 
 /* ========= DISCORD AUTH FLOW ========= */
 
-// halaman login (tombol "Login dengan Discord")
+// halaman login (tombol "Login with Discord")
 app.get("/login", (req, res) => {
   const nextUrl = req.query.next || "/dashboard";
   res.render("discord-login", {
@@ -213,8 +213,8 @@ app.get("/login", (req, res) => {
   });
 });
 
-// redirect ke Discord OAuth
-app.get("/auth/discord", (req, res) => {
+// handler umum untuk redirect ke Discord
+function startDiscordOAuth(req, res) {
   const nextUrl = req.query.next || "/dashboard";
   const state = encodeURIComponent(nextUrl);
 
@@ -228,7 +228,11 @@ app.get("/auth/discord", (req, res) => {
 
   const authUrl = `https://discord.com/oauth2/authorize?${params.toString()}`;
   res.redirect(authUrl);
-});
+}
+
+// support GET dan POST (kalau nanti tombol pakai <form method="POST">)
+app.get("/auth/discord", startDiscordOAuth);
+app.post("/auth/discord", startDiscordOAuth);
 
 // callback dari Discord
 app.get("/auth/discord/callback", async (req, res) => {
@@ -236,6 +240,7 @@ app.get("/auth/discord/callback", async (req, res) => {
   const state = decodeURIComponent(req.query.state || "/dashboard");
 
   if (!code) {
+    console.error("Discord callback tanpa code");
     return res.redirect("/login");
   }
 
@@ -292,8 +297,12 @@ app.get("/auth/discord/callback", async (req, res) => {
 
     res.redirect(state || "/dashboard");
   } catch (err) {
-    console.error("Discord OAuth error:", err.response?.data || err.message);
-    res.redirect("/login");
+    console.error(
+      "Discord OAuth error:",
+      err.response?.data || err.message || err
+    );
+    // biar kelihatan kalau error
+    res.status(500).send("Discord OAuth error. Cek logs Vercel.");
   }
 });
 
@@ -333,7 +342,12 @@ app.post("/admin/login", (req, res) => {
   const { username, password } = req.body || {};
 
   if (!ADMIN_USER || !ADMIN_PASS) {
-    return res.status(500).send("Admin login is not configured.");
+    // kalau env belum diisi
+    return res
+      .status(500)
+      .send(
+        "Admin login is not configured. Set ADMIN_USER dan ADMIN_PASS di Environment Variables."
+      );
   }
 
   if (username === ADMIN_USER && password === ADMIN_PASS) {

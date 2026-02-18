@@ -21,7 +21,7 @@
       "version": "v1.0",
       "status": "working",
       "isFree": true,
-      "thumbnail": "/img/indo-hangout.png",
+      "thumbnail": "/public/img/indo-hangout.png",
       "gameUrl": "https://www.roblox.com/games/YYYYYYYY/Indo-Hangout"
     },
     {
@@ -31,7 +31,7 @@
       "version": "v1.0",
       "status": "working",
       "isFree": true,
-      "thumbnail": "/img/indo-beach.png",
+      "thumbnail": "/public/img/indo-beach.png",
       "gameUrl": "https://www.roblox.com/games/ZZZZZZZZ/Indo-Beach"
     },
     {
@@ -41,7 +41,7 @@
       "version": "v1.0",
       "status": "working",
       "isFree": true,
-      "thumbnail": "/img/dungeon-heroes.png",
+      "thumbnail": "/public/img/dungeon-heroes.png",
       "gameUrl": "https://www.roblox.com/games/ZZZZZZZZ/Dungeon-Heroes"
     },
     {
@@ -51,7 +51,7 @@
       "version": "v1.0",
       "status": "working",
       "isFree": true,
-      "thumbnail": "/img/build-a-zoo.png",
+      "thumbnail": "/public/img/build-a-zoo.png",
       "gameUrl": "https://www.roblox.com/games/ZZZZZZZZ/Build-A-Zoo"
     },
     {
@@ -61,7 +61,7 @@
       "version": "v1.0",
       "status": "maintenance",
       "isFree": true,
-      "thumbnail": "/img/indo-place.png",
+      "thumbnail": "/public/img/indo-place.png",
       "gameUrl": "https://www.roblox.com/games/ZZZZZZZZ/Indo-Place"
     },
     {
@@ -71,7 +71,7 @@
       "version": "v1.0",
       "status": "maintenance",
       "isFree": true,
-      "thumbnail": "/img/indo-ocean.png",
+      "thumbnail": "/public/img/indo-ocean.png",
       "gameUrl": "https://www.roblox.com/games/ZZZZZZZZ/Indo-Ocean"
     },
     {
@@ -81,7 +81,7 @@
       "version": "v1.0.0",
       "status": "maintenance",
       "isFree": true,
-      "thumbnail": "/img/violance-district.png",
+      "thumbnail": "/public/img/violance-district.png",
       "gameUrl": "https://www.roblox.com/games/ZZZZZZZZ/Violance-District"
     }
   ]

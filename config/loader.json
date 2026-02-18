@@ -1,8 +1,8 @@
 {
   "siteName": "ExHub",
-  "tagline": "Dominate Every Game With EXHub.",
-  "discordInvite": "https://discord.gg/yourinvite",
-  "loader": "https://exc-webss.vercel.app/api/script/loader",
+  "tagline": "Let's Hype With EXHub.",
+  "discordInvite": "https://discord.com/invite/Zn3jpF4AdT",
+  "loader": "https://exc-webs.vercel.app/api/script/loader",
   "scripts": [
     {
       "id": "spear-fishing",

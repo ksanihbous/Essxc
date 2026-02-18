@@ -2,19 +2,36 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>404 - <%= siteName %></title>
+  <title>404 - <%= siteName || 'ExHub' %></title>
   <link rel="stylesheet" href="/public/css/main.css" />
+  <!-- protect dari direct-access / iframe dll -->
+  <script src="/public/js/protect.js" defer></script>
 </head>
 <body class="page-dark">
-<div class="center-wrap">
-  <div class="card card-404">
-    <h1>404</h1>
-    <p>This endpoint is only for the Roblox loader.</p>
-    <p class="helper-text">
-      Use the in-game script loader instead of opening this link directly in your browser.
-    </p>
-    <a href="/" class="btn btn-primary">Back to Home</a>
+  <div class="center-wrap">
+    <div class="card card-404">
+      <h1>404</h1>
+      <p>This endpoint is only for the Roblox loader.</p>
+      <p class="helper-text">
+        Use the in-game script loader instead of opening this link directly in your browser.
+      </p>
+
+      <!-- Panel loader di tengah, mirip home -->
+      <div class="loader-panel">
+        <span class="badge badge-soft" style="background:#16a34a22;color:#22c55e;">
+          Loader Script
+        </span>
+
+        <pre class="code-block mono" style="margin-top:12px; white-space:pre-wrap;">
+-- load <%= siteName || 'ExHub' %> Scripts universal loader
+loadstring(game:HttpGet("<%= loaderUrl %>"))()
+        </pre>
+      </div>
+
+      <a href="/" class="btn btn-primary" style="margin-top:16px;">
+        Back to Home
+      </a>
+    </div>
   </div>
-</div>
 </body>
 </html>

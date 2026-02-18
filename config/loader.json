@@ -1,12 +1,8 @@
 {
-  "siteName": "EXHub",
+  "siteName": "ExHub",
   "tagline": "Dominate Every Game With EXHub.",
   "discordInvite": "https://discord.gg/yourinvite",
-
-  // URL loader yang dipanggil dari Roblox:
-  // loadstring(game:HttpGet("https://exc-webss.vercel.app/api/script/loader"))()
   "loader": "https://exc-webss.vercel.app/api/script/loader",
-
   "scripts": [
     {
       "id": "spear-fishing",

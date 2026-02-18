@@ -20,7 +20,7 @@
       "description": "Word game script where every last letter counts.",
       "version": "v1.0",
       "status": "working",
-      "isFree": true,
+      "isFree": false,
       "thumbnail": "/public/img/indo-hangout.png",
       "gameUrl": "https://www.roblox.com/games/YYYYYYYY/Indo-Hangout"
     },
@@ -30,7 +30,7 @@
       "description": "Word game script where every last letter counts.",
       "version": "v1.0",
       "status": "working",
-      "isFree": true,
+      "isFree": false,
       "thumbnail": "/public/img/indo-beach.png",
       "gameUrl": "https://www.roblox.com/games/ZZZZZZZZ/Indo-Beach"
     },
@@ -40,7 +40,7 @@
       "description": "Word game script where every last letter counts.",
       "version": "v1.0",
       "status": "working",
-      "isFree": true,
+      "isFree": false,
       "thumbnail": "/public/img/dungeon-heroes.png",
       "gameUrl": "https://www.roblox.com/games/ZZZZZZZZ/Dungeon-Heroes"
     },
@@ -60,7 +60,7 @@
       "description": "Word game script where every last letter counts.",
       "version": "v1.0",
       "status": "maintenance",
-      "isFree": true,
+      "isFree": false,
       "thumbnail": "/public/img/indo-place.png",
       "gameUrl": "https://www.roblox.com/games/ZZZZZZZZ/Indo-Place"
     },
@@ -70,7 +70,7 @@
       "description": "Word game script where every last letter counts.",
       "version": "v1.0",
       "status": "maintenance",
-      "isFree": true,
+      "isFree": false,
       "thumbnail": "/public/img/indo-ocean.png",
       "gameUrl": "https://www.roblox.com/games/ZZZZZZZZ/Indo-Ocean"
     },
@@ -80,7 +80,7 @@
       "description": "Under maintenance.",
       "version": "v1.0.0",
       "status": "maintenance",
-      "isFree": true,
+      "isFree": false,
       "thumbnail": "/public/img/violance-district.png",
       "gameUrl": "https://www.roblox.com/games/ZZZZZZZZ/Violance-District"
     }

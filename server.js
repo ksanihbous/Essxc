@@ -9,6 +9,7 @@ const cookieSession = require("cookie-session");
 const { Redis } = require("@upstash/redis");
 
 const app = express();
+const IS_PROD = process.env.NODE_ENV === "production";
 
 /* ========= BASIC CONFIG (loader.json) ========= */
 
@@ -43,7 +44,9 @@ const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const DISCORD_GUILD_ID = process.env.DISCORD_GUILD_ID;
 
 if (!DISCORD_CLIENT_ID || !DISCORD_CLIENT_SECRET) {
-  console.warn("[WARN] DISCORD_CLIENT_ID / DISCORD_CLIENT_SECRET belum di-set.");
+  console.warn(
+    "[WARN] DISCORD_CLIENT_ID / DISCORD_CLIENT_SECRET belum di-set."
+  );
 }
 
 /* ========= ADS PROVIDER CONFIG ========= */
@@ -69,16 +72,19 @@ const ADMIN_PASS = process.env.ADMIN_PASS || "";
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
-// *** PENTING: supaya secure cookie jalan di Vercel / reverse proxy ***
+// penting untuk secure cookies di balik proxy (Vercel)
 app.set("trust proxy", 1);
 
 app.use(
   cookieSession({
     name: "exhub_session",
-    secret: process.env.SESSION_SECRET || "dev-secret-change-this",
+    // gunakan keys (bukan secret) supaya kompatibel
+    keys: [process.env.SESSION_SECRET || "dev-secret-change-this"],
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 hari
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    // kalau masih bermasalah bisa diganti false sementara
+    secure: IS_PROD, // Vercel selalu https
   })
 );
 
@@ -100,8 +106,9 @@ app.use((req, res, next) => {
 /* ========= HELPER FUNCTIONS ========= */
 
 function requireAuth(req, res, next) {
-  if (!req.session.user) {
+  if (!req.session || !req.session.user) {
     const nextUrl = encodeURIComponent(req.originalUrl || "/dashboard");
+    console.log("[AUTH] no session, redirect -> /login?next=" + nextUrl);
     return res.redirect(`/login?next=${nextUrl}`);
   }
   next();
@@ -201,16 +208,25 @@ function isKeyActive(info) {
 
 /* ========= DISCORD AUTH FLOW ========= */
 
+// halaman login (tombol Login with Discord)
 app.get("/login", (req, res) => {
-  const nextUrl = req.query.next || "/dashboard";
+  const nextParam =
+    typeof req.query.next === "string" && req.query.next.trim()
+      ? req.query.next
+      : "/dashboard";
   res.render("discord-login", {
-    nextUrl,
+    nextUrl: nextParam,
   });
 });
 
+// redirect ke Discord OAuth
 app.get("/auth/discord", (req, res) => {
-  const nextUrl = req.query.next || "/dashboard";
-  const state = encodeURIComponent(nextUrl);
+  const nextParam =
+    typeof req.query.next === "string" && req.query.next.trim()
+      ? req.query.next
+      : "/dashboard";
+
+  const state = encodeURIComponent(nextParam);
 
   const params = new URLSearchParams({
     client_id: DISCORD_CLIENT_ID,
@@ -224,9 +240,23 @@ app.get("/auth/discord", (req, res) => {
   res.redirect(authUrl);
 });
 
+// callback dari Discord
 app.get("/auth/discord/callback", async (req, res) => {
   const code = req.query.code;
-  const state = decodeURIComponent(req.query.state || "/dashboard");
+  const rawState = req.query.state;
+
+  // default redirect path
+  let nextPath = "/dashboard";
+  if (typeof rawState === "string" && rawState.length > 0) {
+    try {
+      const decoded = decodeURIComponent(rawState);
+      if (decoded.startsWith("/")) {
+        nextPath = decoded;
+      }
+    } catch (e) {
+      console.warn("[WARN] Failed decode state, using /dashboard");
+    }
+  }
 
   if (!code) {
     return res.redirect("/login");
@@ -257,6 +287,7 @@ app.get("/auth/discord/callback", async (req, res) => {
 
     const user = userRes.data;
 
+    // auto add ke guild (opsional)
     if (DISCORD_GUILD_ID && DISCORD_BOT_TOKEN) {
       try {
         await axios.put(
@@ -272,6 +303,7 @@ app.get("/auth/discord/callback", async (req, res) => {
       }
     }
 
+    // simpan user ke session
     req.session.user = {
       id: String(user.id),
       username: user.username,
@@ -279,7 +311,8 @@ app.get("/auth/discord/callback", async (req, res) => {
       avatar: user.avatar,
     };
 
-    res.redirect(state || "/dashboard");
+    console.log("[LOGIN] user", user.id, "redirect ->", nextPath);
+    res.redirect(nextPath);
   } catch (err) {
     console.error("Discord OAuth error:", err.response?.data || err.message);
     res.redirect("/login");

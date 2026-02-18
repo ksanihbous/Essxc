@@ -59,12 +59,7 @@ const LINKVERTISE_BASE_URL =
 
 const KEY_PREFIX = "SIX";
 const KEY_TTL_MS = 3 * 60 * 60 * 1000; // 3 jam
-
-// Verifikasi sesi sebelum callback (harus klik "Start" dulu)
-const VERIFY_SESSION_TTL_SEC = 60; // 1 menit (bisa dinaikkan kalau perlu)
-
-// Hash yang sudah dipakai disimpan singkat lalu hilang sendiri
-const HASH_USED_TTL_SEC = 60; // 1 menit sekali pakai
+const VERIFY_SESSION_TTL_SEC = 10 * 60; // 10 menit sekali pakai
 
 /* ========= ADMIN USER/PASS (ENV) ========= */
 
@@ -76,7 +71,6 @@ const ADMIN_PASS = process.env.ADMIN_PASS || "";
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
-// penting untuk secure cookies di balik proxy (Vercel)
 app.set("trust proxy", 1);
 
 app.use(
@@ -86,7 +80,7 @@ app.use(
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 hari
     httpOnly: true,
     sameSite: "lax",
-    secure: IS_PROD, // Vercel selalu https
+    secure: IS_PROD,
   })
 );
 
@@ -173,7 +167,7 @@ async function saveKeyForUser({ userId, provider, ip, tier = "free" }) {
   const keyKey = `key:${token}`;
 
   await redis.set(keyKey, keyInfo, {
-    px: KEY_TTL_MS + 60 * 60 * 1000, // TTL sedikit lebih panjang dari masa aktif
+    px: KEY_TTL_MS + 60 * 60 * 1000,
   });
 
   await redis.lpush(`user:${userId}:keys`, token);
@@ -209,7 +203,6 @@ function isKeyActive(info) {
 
 /* ========= DISCORD AUTH FLOW ========= */
 
-// halaman login (tombol Login with Discord)
 app.get("/login", (req, res) => {
   const nextParam =
     typeof req.query.next === "string" && req.query.next.trim()
@@ -220,7 +213,6 @@ app.get("/login", (req, res) => {
   });
 });
 
-// redirect ke Discord OAuth
 app.get("/auth/discord", (req, res) => {
   const nextParam =
     typeof req.query.next === "string" && req.query.next.trim()
@@ -241,7 +233,6 @@ app.get("/auth/discord", (req, res) => {
   res.redirect(authUrl);
 });
 
-// callback dari Discord
 app.get("/auth/discord/callback", async (req, res) => {
   const code = req.query.code;
   const rawState = req.query.state;
@@ -287,7 +278,6 @@ app.get("/auth/discord/callback", async (req, res) => {
 
     const user = userRes.data;
 
-    // auto-join guild (opsional)
     if (DISCORD_GUILD_ID && DISCORD_BOT_TOKEN) {
       try {
         await axios.put(
@@ -303,7 +293,6 @@ app.get("/auth/discord/callback", async (req, res) => {
       }
     }
 
-    // simpan user ke session
     req.session.user = {
       id: String(user.id),
       username: user.username,
@@ -420,11 +409,12 @@ app.get("/get-key", requireAuth, async (req, res) => {
   });
 });
 
-// POST: user klik "Start" -> buat verify session di Redis -> redirect ke ads
+// POST: user klik "Start" -> tandai di Redis, lalu redirect ke Work.ink / Linkvertise
 app.post("/get-key/start", requireAuth, async (req, res) => {
   const provider = (req.query.provider || "workink").toLowerCase();
   const user = req.session.user;
 
+  // sekali pakai per provider+user
   const verifyKey = `verify:${provider}:user:${user.id}`;
 
   await redis.set(
@@ -435,30 +425,24 @@ app.post("/get-key/start", requireAuth, async (req, res) => {
       createdAt: nowMs(),
       status: "pending",
     },
-    { ex: VERIFY_SESSION_TTL_SEC } // TTL pendek, misal 60 detik
+    { ex: VERIFY_SESSION_TTL_SEC }
   );
 
   let targetBase = WORKINK_BASE_URL;
   if (provider === "linkvertise") targetBase = LINKVERTISE_BASE_URL;
 
-  // Ads akan redirect ke /get-key/callback?provider=...&hash=...
+  // redirect ke halaman ads
   res.redirect(targetBase);
 });
 
-// GET: callback dari Work.ink / Linkvertise (hash sekali pakai)
+// GET: callback dari Work.ink / Linkvertise
 app.get("/get-key/callback", requireAuth, async (req, res) => {
   const provider = (req.query.provider || "workink").toLowerCase();
-  const hash = req.query.hash;
   const user = req.session.user;
-
-  if (!hash) {
-    return res.status(400).send("Missing verification hash");
-  }
 
   const verifyKey = `verify:${provider}:user:${user.id}`;
   const session = await redis.get(verifyKey);
 
-  // pastikan user tadi benar2 klik tombol Start
   if (!session || session.userId !== user.id || session.provider !== provider) {
     console.warn(
       "[GET-KEY] invalid or expired verification",
@@ -470,36 +454,9 @@ app.get("/get-key/callback", requireAuth, async (req, res) => {
     return res.status(400).send("Invalid or expired verification session.");
   }
 
-  // hash sekali pakai: kalau sudah pernah dipakai, tolak
-  const hashKey = `hash-used:${provider}:${hash}`;
-  const already = await redis.get(hashKey);
-  if (already) {
-    console.warn(
-      "[GET-KEY] hash already used",
-      "provider=",
-      provider,
-      "hash=",
-      hash,
-      "user=",
-      user.id
-    );
-    return res.status(400).send("This verification link was already used.");
-  }
-
-  // tandai hash sebagai sudah dipakai, TTL pendek supaya gak numpuk
-  await redis.set(
-    hashKey,
-    {
-      userId: user.id,
-      usedAt: nowMs(),
-    },
-    { ex: HASH_USED_TTL_SEC }
-  );
-
-  // hapus verify session (supaya sekali flow)
+  // sekali pakai: hapus flag verifikasi
   await redis.del(verifyKey);
 
-  // generate key baru
   const keyInfo = await saveKeyForUser({
     userId: user.id,
     provider,

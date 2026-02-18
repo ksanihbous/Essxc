@@ -51,7 +51,7 @@ if (!DISCORD_CLIENT_ID || !DISCORD_CLIENT_SECRET) {
 /* ========= ADS PROVIDER CONFIG ========= */
 
 const WORKINK_BASE_URL =
-  process.env.WORKINK_BASE_URL || "https://work.ink/your-link";
+  process.envWORKINK_BASE_URL || "https://work.ink/your-link";
 const LINKVERTISE_BASE_URL =
   process.env.LINKVERTISE_BASE_URL || "https://linkvertise.com/your-link";
 
@@ -201,7 +201,7 @@ function isKeyActive(info) {
   return info.expiresAfter > nowMs();
 }
 
-/* ========= BROWSER DETECTION UNTUK /api/script/loader ========= */
+/* ========= BROWSER & EXECUTOR DETECTION UNTUK /api/script/loader ========= */
 
 // Deteksi *browser asli* (Chrome/Firefox/Edge/Safari, dll).
 // Semua executor / HttpService / script non-browser akan lolos.
@@ -235,6 +235,13 @@ function looksLikeRealBrowser(req) {
   //  - UA khas browser, dan
   //  - ada header khas browser / atau jelas minta text/html
   return isBrowserUA && (hasBrowserHints || wantsHtml);
+}
+
+// Deteksi request yang datang dari client Roblox (executor apa pun yang berjalan di dalam Roblox)
+// Mayoritas executor Roblox akan punya UA yang mengandung "roblox".
+function isRobloxUserAgent(req) {
+  const ua = (req.headers["user-agent"] || "").toLowerCase();
+  return ua.includes("roblox");
 }
 
 /* ========= DISCORD AUTH FLOW ========= */
@@ -590,12 +597,33 @@ app.get("/api/script/loader", (req, res) => {
       .send("-- loader.lua missing or unreadable on the server");
   }
 
-  // Jika request terdeteksi sebagai browser asli → jangan bocorin script
+  // 1) Blokir browser asli supaya nggak bisa akses script
   if (looksLikeRealBrowser(req)) {
     return res.status(404).render("api-404");
   }
 
-  // Non-browser (executor apa pun / HttpService / curl, dll) → dapat Lua mentah
+  // 2) Tambahan proteksi: kombinasi isRobloxUserAgent + x-loader-key
+  //
+  //    - Kalau LOADER_KEY TIDAK di-set:
+  //        → hanya pakai anti-browser (semua non-browser lolos).
+  //    - Kalau LOADER_KEY di-set:
+  //        → UA mengandung "roblox"   => lolos (executor Roblox apa pun).
+  //        → Non-roblox client       => wajib kirim header x-loader-key yang cocok.
+  const expectedKey = process.env.LOADER_KEY;
+  const loaderKey = req.headers["x-loader-key"];
+  const robloxUA = isRobloxUserAgent(req);
+  const hasValidKey = expectedKey && loaderKey === expectedKey;
+
+  if (expectedKey && !robloxUA && !hasValidKey) {
+    console.warn(
+      "[LOADER] Forbidden non-roblox client tanpa x-loader-key valid. UA=",
+      req.headers["user-agent"] || ""
+    );
+    // Jangan bocorin info apa-apa, render 404 juga
+    return res.status(403).render("api-404");
+  }
+
+  // Non-browser (+ lolos filter di atas) → kirim Lua mentah
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
   return res.send(loaderLuaSource);
 });

@@ -535,23 +535,28 @@ app.get("/api/isValidate/:token", async (req, res) => {
 
 /* ========= API: LUA LOADER SCRIPT ========= */
 
-const loaderLuaPath = path.join(__dirname, "scripts", "loader.lua");
-const loaderLuaSource = fs.readFileSync(loaderLuaPath, "utf8");
+// baca loader.lua sekali, dengan error handling
+let loaderLuaSource = "";
+try {
+  const loaderLuaPath = path.join(__dirname, "scripts", "loader.lua");
+  loaderLuaSource = fs.readFileSync(loaderLuaPath, "utf8");
+  console.log("[LOADER] Loaded scripts/loader.lua");
+} catch (err) {
+  console.error("[LOADER] Failed to read scripts/loader.lua:", err.message);
+}
 
 app.get("/api/script/loader", (req, res) => {
-  const accept = (req.headers.accept || "").toLowerCase();
-  const ua = (req.headers["user-agent"] || "").toLowerCase();
-
-  const looksBrowser =
-    accept.includes("text/html") ||
-    ua.includes("mozilla") ||
-    ua.includes("chrome");
-
-  if (looksBrowser) {
-    return res.status(404).render("api-404");
+  // Kalau file belum terbaca / hilang → 500
+  if (!loaderLuaSource) {
+    return res
+      .status(500)
+      .type("text/plain")
+      .send("-- loader.lua missing or unreadable on the server");
   }
 
-  res.type("text/plain").send(loaderLuaSource);
+  // Tidak ada lagi cek User-Agent / Accept → support semua executor
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  res.send(loaderLuaSource);
 });
 
 /* ========= 404 FALLBACK ========= */

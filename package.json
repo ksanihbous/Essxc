@@ -1,41 +1,28 @@
 {
   "name": "exc-webs",
   "version": "1.0.0",
-  "description": "ExHub key system, Discord OAuth, and Roblox script loader (like sixsense.cloud style).",
+  "private": true,
+  "description": "ExHub key system, Discord OAuth, and Roblox script loader.",
   "main": "server.js",
   "scripts": {
-    "dev": "nodemon server.js",
+    "dev": "node server.js",
     "start": "node server.js"
-  },
-  "keywords": [
-    "express",
-    "ejs",
-    "roblox",
-    "loader",
-    "discord-oauth",
-    "upstash",
-    "redis",
-    "exhub"
-  ],
-  "author": "ExHub",
-  "license": "MIT",
-  "engines": {
-    "node": ">=18"
   },
   "dependencies": {
     "@upstash/redis": "^1.28.3",
     "axios": "^1.7.9",
     "compression": "^1.7.4",
     "cookie-parser": "^1.4.7",
-    "cookie-session": "^2.0.0",         // <── INI YANG KURANG
+    "cookie-session": "^2.0.0",
     "dotenv": "^16.4.5",
     "ejs": "^3.1.10",
     "express": "^4.21.2",
-    "express-session": "^1.18.1",
-    "morgan": "^1.10.0",
-    "uuid": "^11.0.3"
+    "morgan": "^1.10.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.9"
+  },
+  "engines": {
+    "node": "20.x"
   }
 }

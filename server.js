@@ -201,6 +201,42 @@ function isKeyActive(info) {
   return info.expiresAfter > nowMs();
 }
 
+/* ========= BROWSER DETECTION UNTUK /api/script/loader ========= */
+
+// Deteksi *browser asli* (Chrome/Firefox/Edge/Safari, dll).
+// Semua executor / HttpService / script non-browser akan lolos.
+function looksLikeRealBrowser(req) {
+  const headers = req.headers || {};
+  const ua = (headers["user-agent"] || "").toLowerCase();
+  const accept = (headers["accept"] || "").toLowerCase();
+
+  // header khas browser modern
+  const hasSecFetch =
+    typeof headers["sec-fetch-site"] === "string" ||
+    typeof headers["sec-fetch-mode"] === "string" ||
+    typeof headers["sec-fetch-dest"] === "string";
+
+  const hasSecUA = typeof headers["sec-ch-ua"] === "string";
+  const hasUpgradeInsecure =
+    typeof headers["upgrade-insecure-requests"] === "string";
+
+  const isBrowserUA =
+    ua.includes("mozilla") ||
+    ua.includes("chrome") ||
+    ua.includes("safari") ||
+    ua.includes("firefox") ||
+    ua.includes("edg");
+
+  const wantsHtml = accept.includes("text/html");
+
+  const hasBrowserHints = hasSecFetch || hasSecUA || hasUpgradeInsecure;
+
+  // dianggap browser kalau:
+  //  - UA khas browser, dan
+  //  - ada header khas browser / atau jelas minta text/html
+  return isBrowserUA && (hasBrowserHints || wantsHtml);
+}
+
 /* ========= DISCORD AUTH FLOW ========= */
 
 app.get("/login", (req, res) => {
@@ -554,9 +590,14 @@ app.get("/api/script/loader", (req, res) => {
       .send("-- loader.lua missing or unreadable on the server");
   }
 
-  // Tidak ada lagi cek User-Agent / Accept → support semua executor
+  // Jika request terdeteksi sebagai browser asli → jangan bocorin script
+  if (looksLikeRealBrowser(req)) {
+    return res.status(404).render("api-404");
+  }
+
+  // Non-browser (executor apa pun / HttpService / curl, dll) → dapat Lua mentah
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
-  res.send(loaderLuaSource);
+  return res.send(loaderLuaSource);
 });
 
 /* ========= 404 FALLBACK ========= */

@@ -23,19 +23,26 @@ const redis = new Redis({
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 const DISCORD_REDIRECT_URI =
-  process.env.DISCORD_REDIRECT_URI || "https://exc-webs.vercel.app/auth/discord/callback";
+  process.env.DISCORD_REDIRECT_URI ||
+  "https://exc-webs.vercel.app/auth/discord/callback";
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const DISCORD_GUILD_ID = process.env.DISCORD_GUILD_ID;
 
 // Ads provider URLs (diisi di .env)
-const WORKINK_BASE_URL = process.env.WORKINK_BASE_URL || "https://work.ink/your-link";
+const WORKINK_BASE_URL =
+  process.env.WORKINK_BASE_URL || "https://work.ink/your-link";
 const LINKVERTISE_BASE_URL =
-  process.env.LINKVERTISE_BASE_URL || "https://linkvertise.com/your-link";
+  process.env.LINKVERTISE_BASE_URL ||
+  "https://linkvertise.com/your-link";
 
 // Key config
 const KEY_PREFIX = "SIX";
 const KEY_TTL_MS = 3 * 60 * 60 * 1000; // default 3 jam
 const VERIFY_SESSION_TTL_SEC = 10 * 60; // 10 menit
+
+// Admin panel (user/pass di ENV)
+const ADMIN_USER = process.env.ADMIN_USER || "";
+const ADMIN_PASS = process.env.ADMIN_PASS || "";
 
 // ---------- EXPRESS SETUP ----------
 app.set("view engine", "ejs");
@@ -74,9 +81,21 @@ function requireAuth(req, res, next) {
   next();
 }
 
-// sangat simple, kamu bisa upgrade nanti
+// admin panel auth pakai ADMIN_USER / ADMIN_PASS (ENV)
+function requireAdminPanelAuth(req, res, next) {
+  if (!req.session.adminPanelAuthed) {
+    const nextUrl = encodeURIComponent(req.originalUrl || "/admin");
+    return res.redirect(`/admin/login?next=${nextUrl}`);
+  }
+  next();
+}
+
+// cek admin Discord (whitelist id)
 function isAdmin(req) {
-  const adminIds = (process.env.ADMIN_DISCORD_IDS || "").split(",").map((s) => s.trim());
+  const adminIds = (process.env.ADMIN_DISCORD_IDS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
   return req.session.user && adminIds.includes(String(req.session.user.id));
 }
 
@@ -241,6 +260,55 @@ app.get("/logout", (req, res) => {
   res.redirect("/");
 });
 
+// ---------- ADMIN LOGIN (USERNAME / PASSWORD ENV) ----------
+
+// Form login admin
+app.get("/admin/login", (req, res) => {
+  // kalau sudah login admin-panel, langsung ke tujuan
+  if (req.session && req.session.adminPanelAuthed) {
+    const target = req.query.next || "/admin";
+    return res.redirect(target);
+  }
+
+  res.render("admin-login", {
+    errorMessage: null,
+    redirectTo: req.query.next || "/admin",
+  });
+});
+
+// Proses submit login admin
+app.post("/admin/login", async (req, res) => {
+  const { username, password, redirectTo } = req.body || {};
+
+  if (!ADMIN_USER || !ADMIN_PASS) {
+    return res
+      .status(500)
+      .send("ADMIN_USER or ADMIN_PASS is not set in environment variables.");
+  }
+
+  if (username === ADMIN_USER && password === ADMIN_PASS) {
+    if (!req.session) req.session = {};
+    req.session.adminPanelAuthed = true;
+
+    const target = redirectTo || "/admin";
+    return res.redirect(target);
+  }
+
+  return res.status(401).render("admin-login", {
+    errorMessage: "Wrong username or password.",
+    redirectTo: redirectTo || "/admin",
+  });
+});
+
+// Logout khusus admin panel (tidak menghapus login Discord)
+app.post("/admin/logout", requireAuth, (req, res) => {
+  if (req.session) {
+    req.session.adminPanelAuthed = false;
+  }
+  const nextUrl = req.body.next || "/dashboard";
+  res.redirect(nextUrl);
+});
+
 // ---------- HOME / LANDING ----------
 app.get("/", (req, res) => {
   const scriptsPreview = loaderConfig.scripts.slice(0, 3);
@@ -263,8 +331,9 @@ app.get("/dashboard", requireAuth, async (req, res) => {
 
   const totalKeys = keys.length;
   const activeKeys = keys.filter(isKeyActive).length;
-  const premiumKeys = keys.filter((k) => String(k.token || "").startsWith("EXHUBPAID-"))
-    .length;
+  const premiumKeys = keys.filter((k) =>
+    String(k.token || "").startsWith("EXHUBPAID-")
+  ).length;
 
   res.render("dashboarddc", {
     user,
@@ -350,11 +419,14 @@ app.get("/get-key/callback", requireAuth, async (req, res) => {
     tier: "free",
   });
 
-  res.redirect(`/get-key?provider=${provider}&newKey=${encodeURIComponent(keyInfo.token)}`);
+  res.redirect(
+    `/get-key?provider=${provider}&newKey=${encodeURIComponent(keyInfo.token)}`
+  );
 });
 
-// ---------- ADMIN DASHBOARD (SIMPLE) ----------
-app.get("/admin", requireAuth, async (req, res) => {
+// ---------- ADMIN DASHBOARD ----------
+app.get("/admin", requireAuth, requireAdminPanelAuth, async (req, res) => {
+  // pastikan Discord ID juga termasuk admin whitelist
   if (!isAdmin(req)) return res.status(403).send("Forbidden");
 
   const scripts = loaderConfig.scripts || [];

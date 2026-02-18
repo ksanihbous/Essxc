@@ -2,30 +2,39 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Discord Login - <%= siteName %></title>
+  <title>Discord Login - <%= siteName || 'ExHub' %></title>
   <link rel="stylesheet" href="/public/css/main.css" />
   <script src="/public/js/protect.js" defer></script>
 </head>
 <body class="page-dark">
-<div class="center-wrap">
-  <div class="card">
-    <div class="card-header">
-      <img src="/public/img/logo-discord.png" class="discord-logo-sm" />
-      <h1>Login with Discord</h1>
-      <p>We use Discord to bind your keys and protect against abuse.</p>
-    </div>
-    <div class="card-body">
-      <a
-        href="/auth/discord?<%= new URLSearchParams({ next: nextUrl }).toString() %>"
-        class="btn btn-discord btn-full"
-      >
-        Login with Discord
-      </a>
-      <p class="helper-text">
-        After login you will be redirected back to: <code><%= nextUrl %></code>
-      </p>
+  <div class="center-wrap">
+    <div class="card">
+      <div class="card-header">
+        <!-- Logo discord diperkecil -->
+        <img
+          src="/public/img/logo-discord.png"
+          class="discord-logo-sm"
+          style="width:64px;height:64px;object-fit:contain;"
+          alt="Discord"
+        />
+        <h1>Login with Discord</h1>
+        <p>We use Discord to bind your keys and protect against abuse.</p>
+      </div>
+
+      <div class="card-body">
+        <a
+          href="/auth/discord?<%= 'next=' + encodeURIComponent(nextUrl || '/dashboard') %>"
+          class="btn btn-discord btn-full"
+        >
+          Login with Discord
+        </a>
+
+        <p class="helper-text">
+          After login you will be redirected back to:
+          <code><%= nextUrl || '/dashboard' %></code>
+        </p>
+      </div>
     </div>
   </div>
-</div>
 </body>
 </html>

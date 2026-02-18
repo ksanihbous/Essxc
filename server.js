@@ -57,7 +57,7 @@ const LINKVERTISE_BASE_URL =
 
 /* ========= KEY CONFIG ========= */
 
-const KEY_PREFIX = "SIX";
+const KEY_PREFIX = "EXHUBFREE";
 const KEY_TTL_MS = 3 * 60 * 60 * 1000; // 3 jam
 const VERIFY_SESSION_TTL_SEC = 10 * 60; // 10 menit sekali pakai
 

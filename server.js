@@ -1,601 +1,442 @@
+// server.js
 require("dotenv").config();
+
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
-const cookieParser = require("cookie-parser");
-const jwt = require("jsonwebtoken");
-const crypto = require("crypto");
+const axios = require("axios");
+const cookieSession = require("cookie-session");
 const { Redis } = require("@upstash/redis");
-
-// node-fetch v3 (ESM) di CommonJS
-const fetch = (...args) =>
-  import("node-fetch").then(({ default: fetch }) => fetch(...args));
 
 const app = express();
 
-/* ================================
-   CONFIG & CLIENTS
-================================ */
+// ---------- CONFIG BASIC ----------
+const loaderConfig = require("./config/loader.json");
 
-// load config/loader.json (kalau tidak ada, pakai default)
-let siteConfig = {
-  loader: {},
-  scripts: []
-};
-try {
-  const rawCfg = fs.readFileSync(
-    path.join(__dirname, "config/loader.json"),
-    "utf8"
-  );
-  siteConfig = JSON.parse(rawCfg);
-} catch (err) {
-  console.warn("[WARN] config/loader.json tidak bisa dibaca:", err.message);
-}
-
-// Ambil URL/TOKEN Upstash Redis dari berbagai kemungkinan ENV
-const REDIS_REST_URL =
-  process.env.UPSTASH_REDIS_REST_URL ||
-  process.env.KV_REST_API_URL ||
-  process.env.kv_KV_REST_API_URL;
-
-const REDIS_REST_TOKEN =
-  process.env.UPSTASH_REDIS_REST_TOKEN ||
-  process.env.KV_REST_API_TOKEN ||
-  process.env.kv_KV_REST_API_TOKEN;
-
-if (!REDIS_REST_URL || !REDIS_REST_TOKEN) {
-  console.warn(
-    "[WARN] Upstash Redis ENV tidak lengkap (URL/TOKEN). Pastikan sudah set di Vercel / .env"
-  );
-}
-
+// Upstash Redis
 const redis = new Redis({
-  url: REDIS_REST_URL,
-  token: REDIS_REST_TOKEN
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
-const PORT = process.env.PORT || 3000;
-const BASE_URL = process.env.BASE_URL || "http://localhost:" + PORT;
-const SESSION_SECRET = process.env.SESSION_SECRET || "dev-secret";
+// Discord OAuth & bot
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 const DISCORD_REDIRECT_URI =
-  process.env.DISCORD_REDIRECT_URI || BASE_URL + "/auth/discord/callback";
-const REQUIRED_GUILD_ID = process.env.REQUIRED_GUILD_ID || null;
-const WORKINK_URL = process.env.WORKINK_URL || "https://work.ink/your-link";
-const LINKVERTISE_URL =
-  process.env.LINKVERTISE_URL || "https://linkvertise.com/your-link";
-const KEY_EXPIRE_HOURS = Number(process.env.KEY_EXPIRE_HOURS || 3);
-const ADMIN_IDS = (process.env.ADMIN_IDS || "").split(",").filter(Boolean);
+  process.env.DISCORD_REDIRECT_URI || "https://exc-webs.vercel.app/auth/discord/callback";
+const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
+const DISCORD_GUILD_ID = process.env.DISCORD_GUILD_ID;
 
-/* ================================
-   EXPRESS SETUP
-================================ */
+// Ads provider URLs (diisi di .env)
+const WORKINK_BASE_URL = process.env.WORKINK_BASE_URL || "https://work.ink/your-link";
+const LINKVERTISE_BASE_URL =
+  process.env.LINKVERTISE_BASE_URL || "https://linkvertise.com/your-link";
 
+// Key config
+const KEY_PREFIX = "SIX";
+const KEY_TTL_MS = 3 * 60 * 60 * 1000; // default 3 jam
+const VERIFY_SESSION_TTL_SEC = 10 * 60; // 10 menit
+
+// ---------- EXPRESS SETUP ----------
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
-app.use(express.urlencoded({ extended: true }));
+app.use(
+  cookieSession({
+    name: "exhub_session",
+    secret: process.env.SESSION_SECRET || "dev-secret-change-this",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  })
+);
+
+app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
-app.use(cookieParser());
+app.use("/public", express.static(path.join(__dirname, "public")));
 
-// Static file: mendukung /img/*.png /img/*.jpg /css /js dll
-app.use(express.static(path.join(__dirname, "public")));
+app.locals.siteName = loaderConfig.siteName;
+app.locals.tagline = loaderConfig.tagline;
+app.locals.loaderUrl = loaderConfig.loader;
 
-/* ===== FAVICON HANDLER =====
-   - Browser SELALU minta /favicon.ico dan kadang /favicon.png
-   - Di sini kita coba kirim public/img/logo-exhub.png atau .jpg
-   - Kalau tidak ada, balas 204 No Content (tidak 404 & tidak 500)
-*/
-
-function sendLogoAsFavicon(req, res) {
-  try {
-    const pngPath = path.join(__dirname, "public", "img", "logo-exhub.png");
-    const jpgPath = path.join(__dirname, "public", "img", "logo-exhub.jpg");
-
-    if (fs.existsSync(pngPath)) {
-      return res.sendFile(pngPath);
-    }
-    if (fs.existsSync(jpgPath)) {
-      return res.sendFile(jpgPath);
-    }
-
-    return res.status(204).end(); // tidak ada favicon, tapi bukan error
-  } catch (err) {
-    return res.status(204).end();
-  }
-}
-
-app.get("/favicon.ico", sendLogoAsFavicon);
-app.get("/favicon.png", sendLogoAsFavicon);
-
-/* ================================
-   HELPER FUNCTIONS
-================================ */
-
-function getIp(req) {
-  const raw = req.headers["x-forwarded-for"] || req.socket.remoteAddress || "";
-  return raw.split(",")[0].trim();
-}
-
-function generateKeyString() {
-  const pool = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  function part(len) {
-    let out = "";
-    for (let i = 0; i < len; i++) {
-      out += pool[Math.floor(Math.random() * pool.length)];
-    }
-    return out;
-  }
-  return `SIX-${part(4)}-${part(4)}-${part(4)}`;
-}
-
-function msToTime(ms) {
-  if (ms <= 0) return "Expired";
-  const totalSec = Math.floor(ms / 1000);
-  const h = String(Math.floor(totalSec / 3600)).padStart(2, "0");
-  const m = String(Math.floor((totalSec % 3600) / 60)).padStart(2, "0");
-  const s = String(totalSec % 60).padStart(2, "0");
-  return `${h}:${m}:${s}`;
-}
-
-async function saveKeyRecord(record) {
-  await redis.set(`key:${record.key}`, JSON.stringify(record));
-  await redis.sadd(`user:${record.discordId}:keys`, record.key);
-  await redis.incr("stats:totalKeys");
-  await redis.incr("stats:activeKeys");
-}
-
-async function updateKeyRecord(key, updater) {
-  const raw = await redis.get(`key:${key}`);
-  if (!raw) return null;
-  const data = JSON.parse(raw);
-  const updated = updater(data) || data;
-  await redis.set(`key:${key}`, JSON.stringify(updated));
-  return updated;
-}
-
-async function getUserKeys(discordId) {
-  const keys = (await redis.smembers(`user:${discordId}:keys`)) || [];
-  if (!keys.length) return [];
-  const results = await Promise.all(keys.map((k) => redis.get(`key:${k}`)));
-  return results
-    .filter(Boolean)
-    .map((raw) => JSON.parse(raw))
-    .sort((a, b) => b.createdAt - a.createdAt);
-}
-
-async function getScripts() {
-  const fromDb = await redis.get("scripts");
-  if (fromDb) return JSON.parse(fromDb);
-  return siteConfig.scripts || [];
-}
-
-async function setScripts(list) {
-  await redis.set("scripts", JSON.stringify(list));
-}
-
-/* ================================
-   JWT session <-> req.user
-================================ */
-
+// user ke views
 app.use((req, res, next) => {
-  const token = req.cookies.session;
-  if (!token) {
-    res.locals.user = null;
-    return next();
-  }
-  try {
-    const payload = jwt.verify(token, SESSION_SECRET);
-    req.user = payload;
-    res.locals.user = payload;
-  } catch (err) {
-    res.clearCookie("session");
-    res.locals.user = null;
-  }
+  res.locals.currentUser = req.session.user || null;
   next();
 });
 
+// ---------- HELPER FUNCS ----------
 function requireAuth(req, res, next) {
-  if (!req.user) return res.redirect("/login-required");
-  next();
-}
-
-function requireAdmin(req, res, next) {
-  if (!req.user || !ADMIN_IDS.includes(req.user.id)) {
-    return res.status(403).send("Forbidden");
+  if (!req.session.user) {
+    const nextUrl = encodeURIComponent(req.originalUrl || "/dashboard");
+    return res.redirect(`/login?next=${nextUrl}`);
   }
   next();
 }
 
-/* ================================
-   DISCORD OAUTH
-================================ */
+// sangat simple, kamu bisa upgrade nanti
+function isAdmin(req) {
+  const adminIds = (process.env.ADMIN_DISCORD_IDS || "").split(",").map((s) => s.trim());
+  return req.session.user && adminIds.includes(String(req.session.user.id));
+}
 
+function randomSegment(len) {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let out = "";
+  for (let i = 0; i < len; i++) {
+    out += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return out;
+}
+
+function generateKeyToken(tier = "free") {
+  const prefix = tier === "paid" ? "EXHUBPAID" : KEY_PREFIX;
+  return `${prefix}-${randomSegment(4)}${randomSegment(4)}-${randomSegment(
+    4
+  )}-${randomSegment(4)}`;
+}
+
+function nowMs() {
+  return Date.now();
+}
+
+// Redis helpers
+async function saveKeyForUser({ userId, provider, ip, tier = "free" }) {
+  const token = generateKeyToken(tier);
+  const createdAt = nowMs();
+  const expiresAfter = createdAt + KEY_TTL_MS;
+
+  const keyInfo = {
+    token,
+    createdAt,
+    expiresAfter,
+    userId,
+    byIp: ip || "0.0.0.0",
+    provider,
+    deleted: false,
+  };
+
+  const keyKey = `key:${token}`;
+  await redis.set(keyKey, keyInfo, { px: KEY_TTL_MS + 60 * 60 * 1000 }); // TTL sedikit lebih panjang
+  await redis.lpush(`user:${userId}:keys`, token);
+  return keyInfo;
+}
+
+async function loadKeyInfo(token) {
+  if (!token) return null;
+  return await redis.get(`key:${token}`);
+}
+
+async function loadUserKeys(userId) {
+  if (!userId) return [];
+  const tokens = await redis.lrange(`user:${userId}:keys`, 0, -1);
+  if (!tokens || tokens.length === 0) return [];
+  const pipeline = tokens.map((t) => redis.get(`key:${t}`));
+  const results = await Promise.all(pipeline);
+  // attach token if missing
+  return results
+    .map((info, i) => {
+      if (!info) return null;
+      info.token = info.token || tokens[i];
+      return info;
+    })
+    .filter(Boolean);
+}
+
+function isKeyActive(info) {
+  if (!info || info.deleted) return false;
+  if (!info.expiresAfter) return false;
+  return info.expiresAfter > nowMs();
+}
+
+// ---------- DISCORD AUTH FLOW ----------
 app.get("/login", (req, res) => {
-  res.render("discord-login", { siteConfig });
-});
-
-app.get("/login-required", (req, res) => {
-  res.render("logindc-required", { siteConfig });
-});
-
-app.get("/logout", (req, res) => {
-  res.clearCookie("session");
-  res.redirect("/");
+  const nextUrl = req.query.next || "/dashboard";
+  res.render("discord-login", {
+    nextUrl,
+  });
 });
 
 app.get("/auth/discord", (req, res) => {
+  const nextUrl = req.query.next || "/dashboard";
+  const state = encodeURIComponent(nextUrl);
   const params = new URLSearchParams({
     client_id: DISCORD_CLIENT_ID,
     redirect_uri: DISCORD_REDIRECT_URI,
     response_type: "code",
-    scope: "identify email guilds guilds.join"
+    scope: "identify email guilds.join",
+    state,
   });
-  res.redirect(
-    "https://discord.com/api/oauth2/authorize?" + params.toString()
-  );
+
+  const authUrl = `https://discord.com/api/oauth2/authorize?${params.toString()}`;
+  res.redirect(authUrl);
 });
 
 app.get("/auth/discord/callback", async (req, res) => {
   const code = req.query.code;
-  if (!code) return res.redirect("/login");
+  const state = decodeURIComponent(req.query.state || "/dashboard");
+
+  if (!code) {
+    return res.redirect("/login");
+  }
 
   try {
-    const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      body: new URLSearchParams({
+    // exchange code -> access token
+    const tokenRes = await axios.post(
+      "https://discord.com/api/oauth2/token",
+      new URLSearchParams({
         client_id: DISCORD_CLIENT_ID,
         client_secret: DISCORD_CLIENT_SECRET,
         grant_type: "authorization_code",
         code,
-        redirect_uri: DISCORD_REDIRECT_URI
-      })
+        redirect_uri: DISCORD_REDIRECT_URI,
+      }).toString(),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      }
+    );
+
+    const accessToken = tokenRes.data.access_token;
+
+    // get user info
+    const userRes = await axios.get("https://discord.com/api/users/@me", {
+      headers: { Authorization: `Bearer ${accessToken}` },
     });
 
-    const tokenData = await tokenRes.json();
-    if (!tokenData.access_token) {
-      console.error("OAuth token error", tokenData);
-      return res.redirect("/login");
+    const user = userRes.data;
+
+    // join guild via bot token
+    if (DISCORD_GUILD_ID && DISCORD_BOT_TOKEN) {
+      try {
+        await axios.put(
+          `https://discord.com/api/guilds/${DISCORD_GUILD_ID}/members/${user.id}`,
+          { access_token: accessToken },
+          { headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` } }
+        );
+      } catch (err) {
+        // biasanya error kalau sudah join, abaikan
+        console.warn("Failed to add to guild:", err.response?.data || err.message);
+      }
     }
 
-    const userRes = await fetch("https://discord.com/api/users/@me", {
-      headers: {
-        Authorization: `Bearer ${tokenData.access_token}`
-      }
-    });
-    const user = await userRes.json();
-
-    const payload = {
-      id: user.id,
+    // save ke session
+    req.session.user = {
+      id: String(user.id),
       username: user.username,
       global_name: user.global_name || user.username,
-      avatar: user.avatar
+      avatar: user.avatar,
     };
 
-    const jwtToken = jwt.sign(payload, SESSION_SECRET, {
-      expiresIn: "7d"
-    });
-
-    res.cookie("session", jwtToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax"
-    });
-
-    res.redirect("/dashboard");
+    res.redirect(state || "/dashboard");
   } catch (err) {
-    console.error(err);
+    console.error("Discord OAuth error:", err.response?.data || err.message);
     res.redirect("/login");
   }
 });
 
-/* ================================
-   ROUTES PUBLIC
-================================ */
+app.get("/logout", (req, res) => {
+  req.session = null;
+  res.redirect("/");
+});
 
-// Home (TAB 1)
-app.get("/", async (req, res) => {
-  let totalKeys = 0;
-  let activeKeys = 0;
-  try {
-    totalKeys = Number((await redis.get("stats:totalKeys")) || 0);
-    activeKeys = Number((await redis.get("stats:activeKeys")) || 0);
-  } catch (err) {
-    // ignore
-  }
-
+// ---------- HOME / LANDING ----------
+app.get("/", (req, res) => {
+  const scriptsPreview = loaderConfig.scripts.slice(0, 3);
   res.render("home", {
-    siteConfig,
-    stats: { totalKeys, activeKeys }
+    loaderConfig,
+    scriptsPreview,
   });
 });
 
-// Dashboard user
+// ---------- SCRIPTS LIST ----------
+app.get("/scripts", (req, res) => {
+  const scripts = loaderConfig.scripts || [];
+  res.render("scripts", { scripts, loaderConfig });
+});
+
+// ---------- DASHBOARD DISCORD USER ----------
 app.get("/dashboard", requireAuth, async (req, res) => {
-  const keys = await getUserKeys(req.user.id);
-  const now = Date.now();
+  const user = req.session.user;
+  const keys = await loadUserKeys(user.id);
+
   const totalKeys = keys.length;
-  const active = keys.filter(
-    (k) => k.status === "active" && k.expiresAfter > now
-  ).length;
+  const activeKeys = keys.filter(isKeyActive).length;
+  const premiumKeys = keys.filter((k) => String(k.token || "").startsWith("EXHUBPAID-"))
+    .length;
 
-  res.render("dashboarddc.ejs", {
-    siteConfig,
-    keys,
-    summary: {
+  res.render("dashboarddc", {
+    user,
+    stats: {
       totalKeys,
-      activeKeys: active
-    }
+      activeKeys,
+      premiumKeys,
+    },
+    keys,
   });
 });
 
-// Scripts (TAB 3)
-app.get("/scripts", async (req, res) => {
-  const scripts = await getScripts();
-  res.render("scripts", {
-    siteConfig,
-    scripts,
-    loader: siteConfig.loader
-  });
-});
-
-/* ================================
-   GET KEY FLOW (TAB 2)
-================================ */
-
+// ---------- GET KEY FLOW ----------
 app.get("/get-key", requireAuth, async (req, res) => {
-  const provider = req.query.provider || null;
-  const keys = await getUserKeys(req.user.id);
-  const now = Date.now();
+  const provider = (req.query.provider || req.query.ads || "workink").toLowerCase();
+  const user = req.session.user;
 
-  const keysWithTime = keys.map((k) => ({
-    ...k,
-    timeLeft: msToTime(k.expiresAfter - now),
-    isExpired: k.expiresAfter <= now || k.status !== "active"
-  }));
+  const keys = await loadUserKeys(user.id);
 
-  let sessionCompleted = false;
-  if (provider) {
-    const flag = await redis.get(
-      `session-complete:${req.user.id}:${provider}`
-    );
-    sessionCompleted = Boolean(flag);
-  }
+  // baru dari callback
+  const newKeyToken = req.query.newKey || null;
 
   res.render("get-key", {
-    siteConfig,
     provider,
-    keys: keysWithTime,
-    sessionCompleted
+    user,
+    keys,
+    newKeyToken,
+    keyTtlHours: KEY_TTL_MS / 3600000,
   });
 });
 
-// Start verification (redirect ke Work.ink/Linkvertise + simpan session)
-app.get("/provider/start", requireAuth, async (req, res) => {
-  const provider = req.query.provider;
-  if (!["workink", "linkvertise"].includes(provider)) {
-    return res.redirect("/get-key");
-  }
+// Step 1: user klik "Start" -> bikin verify session lalu redirect ke Work.ink / Linkvertise
+app.post("/get-key/start", requireAuth, async (req, res) => {
+  const provider = (req.query.provider || "workink").toLowerCase();
+  const user = req.session.user;
 
-  const sessionId = crypto.randomUUID();
+  const sessionId = randomSegment(6) + randomSegment(6);
+  const verifyKey = `verify:${sessionId}`;
+
   await redis.set(
-    `session:${sessionId}`,
-    JSON.stringify({ discordId: req.user.id, provider }),
-    { ex: 600 } // 10 menit
+    verifyKey,
+    {
+      userId: user.id,
+      provider,
+      createdAt: nowMs(),
+      status: "pending",
+    },
+    { ex: VERIFY_SESSION_TTL_SEC }
   );
 
-  const externalUrl =
-    provider === "workink"
-      ? `${WORKINK_URL}?sid=${sessionId}`
-      : `${LINKVERTISE_URL}?sid=${sessionId}`;
+  let targetBase = WORKINK_BASE_URL;
+  if (provider === "linkvertise") targetBase = LINKVERTISE_BASE_URL;
 
-  res.redirect(externalUrl);
+  // contoh final: https://work.ink/xxx?sid=SESSIONID
+  const url = new URL(targetBase);
+  url.searchParams.set("sid", sessionId);
+
+  res.redirect(url.toString());
 });
 
-// Callback dari provider
-// Contoh redirect di Work.ink/Linkvertise:
-//   https://exc-webss.vercel.app/provider/callback?provider=workink&sid={sid}
-app.get("/provider/callback", async (req, res) => {
-  const { provider, sid } = req.query;
-  if (!provider || !sid) return res.redirect("/get-key");
+// Step 2: provider redirect balik ke sini setelah task selesai
+app.get("/get-key/callback", requireAuth, async (req, res) => {
+  const provider = (req.query.provider || "workink").toLowerCase();
+  const sid = req.query.sid;
+  const user = req.session.user;
 
-  const raw = await redis.get(`session:${sid}`);
-  if (!raw) {
-    return res.redirect("/get-key?error=session");
-  }
-  const data = JSON.parse(raw);
-  await redis.del(`session:${sid}`);
+  if (!sid) return res.status(400).send("Missing session id");
 
-  await redis.set(`session-complete:${data.discordId}:${provider}`, "1", {
-    ex: 600 // 10 menit untuk generate key
-  });
-
-  res.redirect(`/get-key?provider=${provider}`);
-});
-
-// Generate New Key
-app.post("/get-key/generate", requireAuth, async (req, res) => {
-  const provider = req.body.provider;
-  if (!["workink", "linkvertise"].includes(provider)) {
-    return res.redirect("/get-key");
+  const verifyKey = `verify:${sid}`;
+  const session = await redis.get(verifyKey);
+  if (!session || session.userId !== user.id || session.provider !== provider) {
+    return res.status(400).send("Invalid or expired verification session.");
   }
 
-  const sessionFlag = await redis.get(
-    `session-complete:${req.user.id}:${provider}`
-  );
-  if (!sessionFlag) {
-    return res.redirect(
-      `/get-key?provider=${provider}&error=need_verification`
-    );
-  }
+  // update status & hapus session (opsional)
+  await redis.del(verifyKey);
 
-  const key = generateKeyString();
-  const now = Date.now();
-  const expiresAfter = now + KEY_EXPIRE_HOURS * 60 * 60 * 1000;
-
-  const record = {
-    key,
-    discordId: req.user.id,
+  // bikin key baru
+  const keyInfo = await saveKeyForUser({
+    userId: user.id,
     provider,
-    createdAt: now,
-    expiresAfter,
-    status: "active",
-    byIp: null,
-    hwid: null
-  };
-
-  await saveKeyRecord(record);
-  await redis.del(`session-complete:${req.user.id}:${provider}`);
-
-  res.redirect(`/get-key?provider=${provider}#key-${key}`);
-});
-
-// Extend / Renew key
-app.post("/keys/:key/extend", requireAuth, async (req, res) => {
-  const key = req.params.key;
-  const hours = Number(req.body.hours || KEY_EXPIRE_HOURS);
-  const userId = req.user.id;
-
-  await updateKeyRecord(key, (data) => {
-    if (data.discordId !== userId) return data;
-    const addMs = hours * 60 * 60 * 1000;
-    const base = Math.max(Date.now(), data.expiresAfter || 0);
-    data.expiresAfter = base + addMs;
-    data.status = "active";
-    return data;
+    ip: req.headers["x-forwarded-for"] || req.socket.remoteAddress || "0.0.0.0",
+    tier: "free",
   });
 
-  res.redirect("/get-key");
+  res.redirect(`/get-key?provider=${provider}&newKey=${encodeURIComponent(keyInfo.token)}`);
 });
 
-/* ================================
-   ADMIN DASHBOARD
-================================ */
+// ---------- ADMIN DASHBOARD (SIMPLE) ----------
+app.get("/admin", requireAuth, async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).send("Forbidden");
 
-app.get("/admin", requireAdmin, async (req, res) => {
-  const scripts = await getScripts();
-  const totalKeys = Number((await redis.get("stats:totalKeys")) || 0);
-  const activeKeys = Number((await redis.get("stats:activeKeys")) || 0);
-
+  const scripts = loaderConfig.scripts || [];
   res.render("admin-dashboard", {
-    siteConfig,
+    user: req.session.user,
     scripts,
-    stats: { totalKeys, activeKeys }
   });
 });
 
-app.post("/admin/scripts", requireAdmin, async (req, res) => {
-  const { name, description, version, status, thumbnail, gameUrl, isFree } =
-    req.body;
+// (endpoint CRUD script bisa kamu tambah sendiri nanti menggunakan Redis)
 
-  const scripts = await getScripts();
-  const id =
-    req.body.id ||
-    name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "");
+// ---------- API: VALIDASI KEY UNTUK LUA LOADER ----------
+app.get("/api/isValidate/:token", async (req, res) => {
+  const token = req.params.token;
+  res.setHeader("Content-Type", "application/json");
+  res.setHeader("Access-Control-Allow-Origin", "*");
 
-  const existingIndex = scripts.findIndex((s) => s.id === id);
-  const item = {
-    id,
-    name,
-    description,
-    version,
-    status,
-    thumbnail,
-    gameUrl,
-    isFree: !!isFree
-  };
-
-  if (existingIndex >= 0) {
-    scripts[existingIndex] = item;
-  } else {
-    scripts.push(item);
-  }
-
-  await setScripts(scripts);
-  res.redirect("/admin");
-});
-
-/* ================================
-   API UNTUK LOADER LUA
-================================ */
-
-// Endpoint loader (hanya bisa diakses dari HttpService Roblox)
-app.get("/api/script/loader", (req, res) => {
-  const ua = (req.headers["user-agent"] || "").toLowerCase();
-
-  // simple proteksi: kalau kedeteksi browser biasa, lempar ke 404 ejs
-  const isRoblox = ua.includes("roblox") || ua.includes("httpservice");
-  if (!isRoblox) {
-    return res.status(404).render("api-404", { siteConfig });
-  }
-
-  const filePath = path.join(__dirname, "scripts", "loader.lua");
-  res.setHeader("Content-Type", "text/plain; charset=utf-8");
-  res.send(fs.readFileSync(filePath, "utf8"));
-});
-
-// API simple validasi key (tanpa HWID / bind user)
-app.get("/api/isValidate/:key", async (req, res) => {
-  const key = req.params.key;
-  const ip = getIp(req);
-
-  const raw = await redis.get(`key:${key}`);
-  if (!raw) {
+  if (!token) {
     return res.json({
       valid: false,
       deleted: false,
-      message: "Key not found"
+      info: null,
+      message: "Missing token",
     });
   }
 
-  const data = JSON.parse(raw);
-  const now = Date.now();
-
-  if (data.expiresAfter && data.expiresAfter <= now) {
-    data.status = "expired";
-    await redis.set(`key:${key}`, JSON.stringify(data));
-
+  const keyInfo = await loadKeyInfo(token);
+  if (!keyInfo) {
     return res.json({
       valid: false,
       deleted: false,
-      message: "Key expired"
+      info: null,
+      message: "Key not found",
+    });
+  }
+
+  const expired = keyInfo.expiresAfter && keyInfo.expiresAfter <= nowMs();
+  const deleted = !!keyInfo.deleted;
+
+  if (expired || deleted) {
+    return res.json({
+      valid: false,
+      deleted,
+      info: keyInfo,
+      message: expired ? "Key expired" : "Key deleted",
     });
   }
 
   return res.json({
     valid: true,
     deleted: false,
-    message: "OK",
-    info: {
-      key: data.key,
-      createdAt: data.createdAt || null,
-      expiresAfter: data.expiresAfter || null,
-      provider: data.provider || null,
-      discordId: data.discordId || null,
-      byIp: data.byIp || ip
-    }
+    info: keyInfo,
   });
 });
 
-/* ================================
-   404 DEFAULT
-================================ */
+// ---------- API: LUA LOADER SCRIPT ----------
+const loaderLuaPath = path.join(__dirname, "scripts", "loader.lua");
+const loaderLuaSource = fs.readFileSync(loaderLuaPath, "utf8");
 
-app.use((req, res) => {
-  res.status(404).render("api-404", { siteConfig });
+app.get("/api/script/loader", (req, res) => {
+  const accept = (req.headers.accept || "").toLowerCase();
+  const ua = (req.headers["user-agent"] || "").toLowerCase();
+
+  const looksBrowser =
+    accept.includes("text/html") || ua.includes("mozilla") || ua.includes("chrome");
+
+  // kalau kelihatan dari browser -> 404 page ejs
+  if (looksBrowser) {
+    return res.status(404).render("api-404");
+  }
+
+  // kalau dari executor / HttpGet Roblox
+  res.type("text/plain").send(loaderLuaSource);
 });
 
-/* ================================
-   START
-================================ */
+// ---------- 404 FALLBACK ----------
+app.use((req, res) => {
+  res.status(404).render("api-404");
+});
 
+// ---------- START SERVER (untuk dev lokal) ----------
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log("EXC Webs running on port", PORT);
+  console.log(`ExHub web running on http://localhost:${PORT}`);
 });

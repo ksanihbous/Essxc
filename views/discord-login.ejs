@@ -1,20 +1,31 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Login - <%= siteConfig.siteName %></title>
-  <link rel="stylesheet" href="/css/main.css">
+  <meta charset="UTF-8" />
+  <title>Discord Login - <%= siteName %></title>
+  <link rel="stylesheet" href="/public/css/main.css" />
+  <script src="/public/js/protect.js" defer></script>
 </head>
-<body class="bg-grid center-page">
+<body class="page-dark">
+<div class="center-wrap">
   <div class="card">
-    <h2>Login with Discord</h2>
-    <p>You need to login with Discord to manage keys and scripts.</p>
-    <a href="/auth/discord" class="btn btn-discord wide">
-      <img src="/img/logo-discord.png" class="icon-sm">
-      Login with Discord
-    </a>
-    <a href="/" class="link-muted">← Back to Home</a>
+    <div class="card-header">
+      <img src="/public/img/logo-discord.png" class="discord-logo-sm" />
+      <h1>Login with Discord</h1>
+      <p>We use Discord to bind your keys and protect against abuse.</p>
+    </div>
+    <div class="card-body">
+      <a
+        href="/auth/discord?<%= new URLSearchParams({ next: nextUrl }).toString() %>"
+        class="btn btn-discord btn-full"
+      >
+        Login with Discord
+      </a>
+      <p class="helper-text">
+        After login you will be redirected back to: <code><%= nextUrl %></code>
+      </p>
+    </div>
   </div>
-  <script src="/js/protect.js"></script>
+</div>
 </body>
 </html>

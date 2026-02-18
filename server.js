@@ -15,10 +15,6 @@ const app = express();
 const loaderConfig = require("./config/loader.json");
 
 /* ========= UPSTASH REDIS / VERCEL KV ========= */
-// Bisa pakai:
-//   UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN
-//   atau fallback dari Vercel KV:
-//   KV_REST_API_URL / KV_REST_API_TOKEN
 
 const REDIS_REST_URL =
   process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
@@ -73,6 +69,9 @@ const ADMIN_PASS = process.env.ADMIN_PASS || "";
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
+// *** PENTING: supaya secure cookie jalan di Vercel / reverse proxy ***
+app.set("trust proxy", 1);
+
 app.use(
   cookieSession({
     name: "exhub_session",
@@ -109,10 +108,8 @@ function requireAuth(req, res, next) {
 }
 
 function isAdmin(req) {
-  // 1) admin login via username/password
   if (req.session && req.session.adminUser) return true;
 
-  // 2) admin via Discord ID (opsional)
   const adminIds = (process.env.ADMIN_DISCORD_IDS || "")
     .split(",")
     .map((s) => s.trim())
@@ -167,7 +164,6 @@ async function saveKeyForUser({ userId, provider, ip, tier = "free" }) {
 
   const keyKey = `key:${token}`;
 
-  // TTL sedikit lebih panjang dari masa aktif key
   await redis.set(keyKey, keyInfo, {
     px: KEY_TTL_MS + 60 * 60 * 1000,
   });
@@ -205,7 +201,6 @@ function isKeyActive(info) {
 
 /* ========= DISCORD AUTH FLOW ========= */
 
-// halaman login (tombol "Login with Discord")
 app.get("/login", (req, res) => {
   const nextUrl = req.query.next || "/dashboard";
   res.render("discord-login", {
@@ -213,8 +208,7 @@ app.get("/login", (req, res) => {
   });
 });
 
-// handler umum untuk redirect ke Discord
-function startDiscordOAuth(req, res) {
+app.get("/auth/discord", (req, res) => {
   const nextUrl = req.query.next || "/dashboard";
   const state = encodeURIComponent(nextUrl);
 
@@ -228,24 +222,17 @@ function startDiscordOAuth(req, res) {
 
   const authUrl = `https://discord.com/oauth2/authorize?${params.toString()}`;
   res.redirect(authUrl);
-}
+});
 
-// support GET dan POST (kalau nanti tombol pakai <form method="POST">)
-app.get("/auth/discord", startDiscordOAuth);
-app.post("/auth/discord", startDiscordOAuth);
-
-// callback dari Discord
 app.get("/auth/discord/callback", async (req, res) => {
   const code = req.query.code;
   const state = decodeURIComponent(req.query.state || "/dashboard");
 
   if (!code) {
-    console.error("Discord callback tanpa code");
     return res.redirect("/login");
   }
 
   try {
-    // tukar code -> access token
     const tokenRes = await axios.post(
       "https://discord.com/api/oauth2/token",
       new URLSearchParams({
@@ -264,14 +251,12 @@ app.get("/auth/discord/callback", async (req, res) => {
 
     const accessToken = tokenRes.data.access_token;
 
-    // ambil data user
     const userRes = await axios.get("https://discord.com/api/users/@me", {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
 
     const user = userRes.data;
 
-    // auto-join guild via bot (opsional)
     if (DISCORD_GUILD_ID && DISCORD_BOT_TOKEN) {
       try {
         await axios.put(
@@ -287,7 +272,6 @@ app.get("/auth/discord/callback", async (req, res) => {
       }
     }
 
-    // simpan ke session
     req.session.user = {
       id: String(user.id),
       username: user.username,
@@ -297,12 +281,8 @@ app.get("/auth/discord/callback", async (req, res) => {
 
     res.redirect(state || "/dashboard");
   } catch (err) {
-    console.error(
-      "Discord OAuth error:",
-      err.response?.data || err.message || err
-    );
-    // biar kelihatan kalau error
-    res.status(500).send("Discord OAuth error. Cek logs Vercel.");
+    console.error("Discord OAuth error:", err.response?.data || err.message);
+    res.redirect("/login");
   }
 });
 
@@ -326,7 +306,7 @@ app.get("/scripts", (req, res) => {
   res.render("scripts", { scripts, loaderConfig });
 });
 
-/* ========= ADMIN LOGIN (USER/PASS) ========= */
+/* ========= ADMIN LOGIN ========= */
 
 app.get("/admin/login", (req, res) => {
   if (isAdmin(req)) {
@@ -342,12 +322,7 @@ app.post("/admin/login", (req, res) => {
   const { username, password } = req.body || {};
 
   if (!ADMIN_USER || !ADMIN_PASS) {
-    // kalau env belum diisi
-    return res
-      .status(500)
-      .send(
-        "Admin login is not configured. Set ADMIN_USER dan ADMIN_PASS di Environment Variables."
-      );
+    return res.status(500).send("Admin login is not configured.");
   }
 
   if (username === ADMIN_USER && password === ADMIN_PASS) {
@@ -370,7 +345,7 @@ app.post("/admin/logout", (req, res) => {
   res.redirect("/");
 });
 
-/* ========= DASHBOARD DISCORD USER ========= */
+/* ========= DASHBOARD ========= */
 
 app.get("/dashboard", requireAuth, async (req, res) => {
   const user = req.session.user;
@@ -411,7 +386,6 @@ app.get("/get-key", requireAuth, async (req, res) => {
   });
 });
 
-// Step 1: buat verify session, redirect ke Ads
 app.post("/get-key/start", requireAuth, async (req, res) => {
   const provider = (req.query.provider || "workink").toLowerCase();
   const user = req.session.user;
@@ -439,7 +413,6 @@ app.post("/get-key/start", requireAuth, async (req, res) => {
   res.redirect(url.toString());
 });
 
-// Step 2: callback dari Ads
 app.get("/get-key/callback", requireAuth, async (req, res) => {
   const provider = (req.query.provider || "workink").toLowerCase();
   const sid = req.query.sid;
@@ -487,7 +460,7 @@ app.get("/admin", requireAdmin, async (req, res) => {
   });
 });
 
-/* ========= API: VALIDASI KEY UNTUK LUA LOADER ========= */
+/* ========= API: VALIDASI KEY ========= */
 
 app.get("/api/isValidate/:token", async (req, res) => {
   const token = req.params.token;
@@ -559,9 +532,8 @@ app.use((req, res) => {
   res.status(404).render("api-404");
 });
 
-/* ========= EXPORT UNTUK VERCEL & START LOKAL ========= */
+/* ========= EXPORT / START LOCAL ========= */
 
-// dev lokal: `node server.js`
 if (require.main === module) {
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => {
@@ -569,5 +541,4 @@ if (require.main === module) {
   });
 }
 
-// untuk serverless di Vercel
 module.exports = app;

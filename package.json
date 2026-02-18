@@ -5,14 +5,16 @@
   "description": "ExHub key system, Discord OAuth, and Roblox script loader.",
   "main": "server.js",
   "scripts": {
-    "dev": "node server.js",
+    "dev": "nodemon server.js",
     "start": "node server.js"
+  },
+  "engines": {
+    "node": "20.x"
   },
   "dependencies": {
     "@upstash/redis": "^1.28.3",
     "axios": "^1.7.9",
     "compression": "^1.7.4",
-    "cookie-parser": "^1.4.7",
     "cookie-session": "^2.0.0",
     "dotenv": "^16.4.5",
     "ejs": "^3.1.10",

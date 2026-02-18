@@ -1,0 +1,25 @@
+<header class="nav">
+  <div class="nav-left">
+    <a href="/" class="nav-brand">
+      <img src="/public/img/logo-exhub.png" class="nav-logo" alt="ExHub" />
+      <div class="nav-title">
+        <span class="site-name"><%= siteName %></span>
+        <span class="site-tagline"><%= tagline %></span>
+      </div>
+    </a>
+  </div>
+  <nav class="nav-links">
+    <a href="/" class="nav-link <%= active === 'home' ? 'nav-link-active' : '' %>">Home</a>
+    <a href="/get-key?provider=workink" class="nav-link <%= active === 'get-key' ? 'nav-link-active' : '' %>">Get Key</a>
+    <a href="/scripts" class="nav-link <%= active === 'scripts' ? 'nav-link-active' : '' %>">Scripts</a>
+    <% if (currentUser) { %>
+      <a href="/dashboard" class="nav-link <%= active === 'dashboard' ? 'nav-link-active' : '' %>">Dashboard</a>
+      <% if (currentUser && currentUser.id) { %>
+        <a href="/admin" class="nav-link <%= active === 'admin' ? 'nav-link-active' : '' %>">Admin</a>
+      <% } %>
+      <a href="/logout" class="nav-link nav-link-ghost">Logout</a>
+    <% } else { %>
+      <a href="/login" class="nav-link nav-link-ghost">Login</a>
+    <% } %>
+  </nav>
+</header>

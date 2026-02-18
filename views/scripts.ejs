@@ -1,64 +1,57 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Scripts - <%= siteConfig.siteName %></title>
-  <link rel="stylesheet" href="/css/main.css">
+  <meta charset="UTF-8" />
+  <title>Scripts - <%= siteName %></title>
+  <link rel="stylesheet" href="/public/css/main.css" />
+  <script src="/public/js/protect.js" defer></script>
 </head>
-<body class="bg-grid">
-<header class="nav">
-  <div class="nav-left">
-    <img src="/img/logo-exhub.png" class="logo">
-    <span class="nav-title"><%= siteConfig.siteName %></span>
-  </div>
-  <nav class="nav-links">
-    <a href="/">Home</a>
-    <a href="/get-key">Get Key</a>
-    <a href="/scripts" class="active">Scripts</a>
-    <% if (user) { %>
-      <a href="/dashboard">Dashboard</a>
-      <a href="/logout">Logout</a>
-    <% } else { %>
-      <a href="/login">Login</a>
-    <% } %>
-  </nav>
-</header>
+<body class="page-dark">
+<%- include('partials/nav', { active: 'scripts' }) %>
 
-<main class="content">
-  <section class="section">
+<main class="container">
+  <section class="page-header">
     <h1>Supported Games</h1>
-    <p class="muted">Browse our collection of premium scripts for popular Roblox games.</p>
+    <p>Browse scripts that are available in <%= siteName %>. You can manage the list from the admin dashboard later.</p>
+  </section>
 
-    <div class="scripts-grid">
-      <% scripts.forEach(function(s){ %>
-        <div class="card script-card">
-          <div class="thumb-wrapper">
-            <img src="<%= s.thumbnail %>" class="thumb">
-            <span class="badge badge-version"><%= s.version %></span>
+  <section class="scripts-grid">
+    <% scripts.forEach(function(s) { %>
+      <article class="script-card">
+        <img src="<%= s.thumbnail %>" alt="<%= s.name %>" class="script-card-thumb" />
+        <div class="script-card-body">
+          <div class="script-card-header">
+            <h2><%= s.name %></h2>
+            <span class="script-version"><%= s.version %></span>
           </div>
-          <h3><%= s.name %></h3>
-          <p class="muted"><%= s.description %></p>
-
-          <div class="script-meta">
-            <span class="badge <%= s.status === 'working' ? 'badge-active' : 'badge-expired' %>">
+          <p class="script-desc"><%= s.description %></p>
+          <div class="script-meta-row">
+            <span class="status-pill <%= s.status === 'working' ? 'status-working' : 'status-maint' %>">
               <%= s.status === 'working' ? 'Working' : 'Maintenance' %>
             </span>
             <% if (s.isFree) { %>
-              <span class="badge badge-free">Free</span>
+              <span class="badge badge-soft">Free</span>
             <% } %>
           </div>
-
-          <div class="script-actions">
-            <button class="btn btn-xs btn-copy"
-                    data-copy="<%= loader %>">Copy Loader</button>
-            <a href="<%= s.gameUrl %>" target="_blank" class="btn btn-xs btn-outline">Game Link</a>
-          </div>
         </div>
-      <% }) %>
-    </div>
+        <div class="script-card-footer">
+          <button
+            class="btn btn-small btn-primary"
+            onclick="navigator.clipboard && navigator.clipboard.writeText('loadstring(game:HttpGet(\\'<%= loaderConfig.loader %>\\'))()');"
+          >
+            Copy Loader
+          </button>
+          <a href="<%= s.gameUrl %>" target="_blank" class="btn btn-small btn-outline">
+            Game Link
+          </a>
+        </div>
+      </article>
+    <% }) %>
   </section>
 </main>
 
-<script src="/js/protect.js"></script>
+<footer class="footer">
+  <span><%= scripts.length %> supported games.</span>
+</footer>
 </body>
 </html>

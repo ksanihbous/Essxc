@@ -1,107 +1,50 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Admin - <%= siteConfig.siteName %></title>
-  <link rel="stylesheet" href="/css/main.css">
+  <meta charset="UTF-8" />
+  <title>Admin Dashboard - <%= siteName %></title>
+  <link rel="stylesheet" href="/public/css/main.css" />
+  <script src="/public/js/protect.js" defer></script>
 </head>
-<body class="bg-grid">
-<header class="nav">
-  <div class="nav-left">
-    <img src="/img/logo-exhub.png" class="logo">
-    <span class="nav-title"><%= siteConfig.siteName %> Admin</span>
-  </div>
-  <nav class="nav-links">
-    <a href="/">Home</a>
-    <a href="/dashboard">Dashboard</a>
-    <a href="/admin" class="active">Admin</a>
-    <a href="/logout">Logout</a>
-  </nav>
-</header>
+<body class="page-dark">
+<%- include('partials/nav', { active: 'admin' }) %>
 
-<main class="content">
-  <section class="section">
+<main class="container">
+  <section class="page-header">
     <h1>Admin Dashboard</h1>
-    <div class="dashboard-stats">
-      <div class="card stat-card">
-        <span class="stat-label">Total Keys</span>
-        <span class="stat-value"><%= stats.totalKeys %></span>
-      </div>
-      <div class="card stat-card">
-        <span class="stat-label">Active Keys</span>
-        <span class="stat-value"><%= stats.activeKeys %></span>
-      </div>
-    </div>
+    <p>Only Discord IDs in <code>ADMIN_DISCORD_IDS</code> can access this page.</p>
+  </section>
 
-    <div class="admin-layout">
-      <div class="card">
-        <h3>Scripts</h3>
-        <table class="keys-table">
-          <thead>
-          <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Version</th>
-            <th>Status</th>
-          </tr>
-          </thead>
-          <tbody>
-          <% scripts.forEach(function(s){ %>
-            <tr>
-              <td class="mono"><%= s.id %></td>
-              <td><%= s.name %></td>
-              <td><%= s.version %></td>
-              <td><%= s.status %></td>
-            </tr>
-          <% }) %>
-          </tbody>
-        </table>
-      </div>
+  <section class="card">
+    <h2>Scripts Config (read-only)</h2>
+    <p class="helper-text">
+      This table is loaded from <code>config/loader.json</code>. You can extend this page to save
+      changes into Redis so it updates without redeploy.
+    </p>
 
-      <div class="card">
-        <h3>Add / Edit Script</h3>
-        <form method="POST" action="/admin/scripts" class="form-grid">
-          <label>
-            Name
-            <input type="text" name="name" required>
-          </label>
-          <label>
-            ID (optional, auto from name)
-            <input type="text" name="id">
-          </label>
-          <label>
-            Description
-            <textarea name="description" rows="3"></textarea>
-          </label>
-          <label>
-            Version
-            <input type="text" name="version" value="v1.0.0">
-          </label>
-          <label>
-            Status
-            <select name="status">
-              <option value="working">Working</option>
-              <option value="maintenance">Maintenance</option>
-            </select>
-          </label>
-          <label>
-            Thumbnail URL
-            <input type="text" name="thumbnail" placeholder="/img/your-thumb.png">
-          </label>
-          <label>
-            Game Link
-            <input type="url" name="gameUrl" required>
-          </label>
-          <label class="checkbox">
-            <input type="checkbox" name="isFree" checked> Free
-          </label>
-          <button type="submit" class="btn btn-accent wide">Save</button>
-        </form>
-      </div>
-    </div>
+    <table class="keys-table">
+      <thead>
+      <tr>
+        <th>ID</th>
+        <th>Name</th>
+        <th>Version</th>
+        <th>Status</th>
+        <th>Game URL</th>
+      </tr>
+      </thead>
+      <tbody>
+      <% scripts.forEach(function(s) { %>
+        <tr>
+          <td><code><%= s.id %></code></td>
+          <td><%= s.name %></td>
+          <td><%= s.version %></td>
+          <td><%= s.status %></td>
+          <td><a href="<%= s.gameUrl %>" target="_blank">open</a></td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
   </section>
 </main>
-
-<script src="/js/protect.js"></script>
 </body>
 </html>

@@ -9,7 +9,7 @@
     "start": "node server.js"
   },
   "engines": {
-    "node": "20.x"
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "@upstash/redis": "^1.28.3",

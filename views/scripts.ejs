@@ -2,56 +2,105 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Scripts - <%= siteName %></title>
+  <title>Scripts - <%= siteName || 'ExHub' %></title>
   <link rel="stylesheet" href="/public/css/main.css" />
   <script src="/public/js/protect.js" defer></script>
 </head>
 <body class="page-dark">
-<%- include('partials/nav', { active: 'scripts' }) %>
+  <%- include('partials/nav', { active: 'scripts' }) %>
 
-<main class="container">
-  <section class="page-header">
-    <h1>Supported Games</h1>
-    <p>Browse scripts that are available in <%= siteName %>. You can manage the list from the admin dashboard later.</p>
-  </section>
+  <main class="container">
+    <section class="page-header">
+      <h1>Supported Games</h1>
+      <p>
+        Browse scripts that are available in <%= siteName || 'ExHub' %>.
+        You can manage the list from the admin dashboard later.
+      </p>
+    </section>
 
-  <section class="scripts-grid">
-    <% scripts.forEach(function(s) { %>
-      <article class="script-card">
-        <img src="<%= s.thumbnail %>" alt="<%= s.name %>" class="script-card-thumb" />
-        <div class="script-card-body">
-          <div class="script-card-header">
-            <h2><%= s.name %></h2>
-            <span class="script-version"><%= s.version %></span>
+    <section class="scripts-grid">
+      <% scripts.forEach(function(s) { %>
+        <article class="script-card">
+          <img
+            src="<%= s.thumbnail %>"
+            alt="<%= s.name %>"
+            class="script-card-thumb"
+          />
+
+          <div class="script-card-body">
+            <div class="script-card-header">
+              <h2><%= s.name %></h2>
+              <span class="script-version"><%= s.version %></span>
+            </div>
+
+            <p class="script-desc"><%= s.description %></p>
+
+            <div class="script-meta-row">
+              <span class="status-pill <%= s.status === 'working'
+                                          ? 'status-working'
+                                          : 'status-maint' %>">
+                <%= s.status === 'working' ? 'Working' : 'Maintenance' %>
+              </span>
+
+              <% if (s.isFree) { %>
+                <span class="badge badge-soft">Free</span>
+              <% } %>
+            </div>
           </div>
-          <p class="script-desc"><%= s.description %></p>
-          <div class="script-meta-row">
-            <span class="status-pill <%= s.status === 'working' ? 'status-working' : 'status-maint' %>">
-              <%= s.status === 'working' ? 'Working' : 'Maintenance' %>
-            </span>
-            <% if (s.isFree) { %>
-              <span class="badge badge-soft">Free</span>
-            <% } %>
-          </div>
-        </div>
-        <div class="script-card-footer">
-          <button
-            class="btn btn-small btn-primary"
-            onclick="navigator.clipboard && navigator.clipboard.writeText('loadstring(game:HttpGet("loadstring(game:HttpGet("https://exc-webs.vercel.app/api/script/loader")");"
-          >
-            Copy Loader
-          </button>
-          <a href="<%= s.gameUrl %>" target="_blank" class="btn btn-small btn-outline">
-            Game Link
-          </a>
-        </div>
-      </article>
-    <% }) %>
-  </section>
-</main>
 
-<footer class="footer">
-  <span><%= scripts.length %> supported games.</span>
-</footer>
+          <div class="script-card-footer">
+            <!-- Copy Loader pakai URL dari loader.json (app.locals.loaderUrl) -->
+            <button
+              type="button"
+              class="btn btn-small btn-primary"
+              data-loader-url="<%= loaderUrl %>"
+              onclick="copyLoader(this)"
+            >
+              Copy Loader
+            </button>
+
+            <a
+              href="<%= s.gameUrl %>"
+              target="_blank"
+              class="btn btn-small btn-outline"
+            >
+              Game Link
+            </a>
+          </div>
+        </article>
+      <% }) %>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span><%= scripts.length %> supported games.</span>
+  </footer>
+
+  <!-- Script kecil untuk copy ke clipboard -->
+  <script>
+    const DEFAULT_LOADER_URL = "<%= loaderUrl %>";
+
+    function buildLoaderString(url) {
+      return 'loadstring(game:HttpGet("' + url + '"))()';
+    }
+
+    async function copyLoader(btn) {
+      try {
+        const url = btn.getAttribute("data-loader-url") || DEFAULT_LOADER_URL;
+        const text = buildLoaderString(url);
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+          alert("Loader copied:\n" + text);
+        } else {
+          // fallback lama
+          window.prompt("Copy this loader:", text);
+        }
+      } catch (err) {
+        console.error("Failed to copy loader:", err);
+        window.prompt("Copy this loader:", buildLoaderString(DEFAULT_LOADER_URL));
+      }
+    }
+  </script>
 </body>
 </html>

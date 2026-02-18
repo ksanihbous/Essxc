@@ -7,7 +7,6 @@ const fs = require("fs");
 const axios = require("axios");
 const cookieSession = require("cookie-session");
 const { Redis } = require("@upstash/redis");
-const cookieSession = require("cookie-session");
 
 const app = express();
 
@@ -24,24 +23,21 @@ const redis = new Redis({
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 const DISCORD_REDIRECT_URI =
-  process.env.DISCORD_REDIRECT_URI ||
-  "https://exc-webs.vercel.app/auth/discord/callback";
+  process.env.DISCORD_REDIRECT_URI || "https://excwebs.vercel.app/auth/discord/callback";
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const DISCORD_GUILD_ID = process.env.DISCORD_GUILD_ID;
 
 // Ads provider URLs (diisi di .env)
-const WORKINK_BASE_URL =
-  process.env.WORKINK_BASE_URL || "https://work.ink/your-link";
+const WORKINK_BASE_URL = process.env.Workink_BASE_URL || "https://work.ink/your-link";
 const LINKVERTISE_BASE_URL =
-  process.env.LINKVERTISE_BASE_URL ||
-  "https://linkvertise.com/your-link";
+  process.env.LINKVERTISE_BASE_URL || "https://linkvertise.com/your-link";
 
 // Key config
 const KEY_PREFIX = "SIX";
 const KEY_TTL_MS = 3 * 60 * 60 * 1000; // default 3 jam
 const VERIFY_SESSION_TTL_SEC = 10 * 60; // 10 menit
 
-// Admin panel (user/pass di ENV)
+// Admin env credentials
 const ADMIN_USER = process.env.ADMIN_USER || "";
 const ADMIN_PASS = process.env.ADMIN_PASS || "";
 
@@ -70,6 +66,7 @@ app.locals.loaderUrl = loaderConfig.loader;
 // user ke views
 app.use((req, res, next) => {
   res.locals.currentUser = req.session.user || null;
+  res.locals.adminUser = req.session.adminUser || null;
   next();
 });
 
@@ -82,22 +79,23 @@ function requireAuth(req, res, next) {
   next();
 }
 
-// admin panel auth pakai ADMIN_USER / ADMIN_PASS (ENV)
-function requireAdminPanelAuth(req, res, next) {
-  if (!req.session.adminPanelAuthed) {
-    const nextUrl = encodeURIComponent(req.originalUrl || "/admin");
-    return res.redirect(`/admin/login?next=${nextUrl}`);
-  }
-  next();
-}
-
-// cek admin Discord (whitelist id)
 function isAdmin(req) {
+  // 1) admin login via username/password
+  if (req.session && req.session.adminUser) return true;
+
+  // 2) optional Discord id based admin
   const adminIds = (process.env.ADMIN_DISCORD_IDS || "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
   return req.session.user && adminIds.includes(String(req.session.user.id));
+}
+
+function requireAdmin(req, res, next) {
+  if (!isAdmin(req)) {
+    return res.redirect("/admin/login");
+  }
+  next();
 }
 
 function randomSegment(len) {
@@ -261,62 +259,51 @@ app.get("/logout", (req, res) => {
   res.redirect("/");
 });
 
-// ---------- ADMIN LOGIN (USERNAME / PASSWORD ENV) ----------
-
-// Form login admin
-app.get("/admin/login", (req, res) => {
-  // kalau sudah login admin-panel, langsung ke tujuan
-  if (req.session && req.session.adminPanelAuthed) {
-    const target = req.query.next || "/admin";
-    return res.redirect(target);
-  }
-
-  res.render("admin-login", {
-    errorMessage: null,
-    redirectTo: req.query.next || "/admin",
-  });
-});
-
-// Proses submit login admin
-app.post("/admin/login", async (req, res) => {
-  const { username, password, redirectTo } = req.body || {};
-
-  if (!ADMIN_USER || !ADMIN_PASS) {
-    return res
-      .status(500)
-      .send("ADMIN_USER or ADMIN_PASS is not set in environment variables.");
-  }
-
-  if (username === ADMIN_USER && password === ADMIN_PASS) {
-    if (!req.session) req.session = {};
-    req.session.adminPanelAuthed = true;
-
-    const target = redirectTo || "/admin";
-    return res.redirect(target);
-  }
-
-  return res.status(401).render("admin-login", {
-    errorMessage: "Wrong username or password.",
-    redirectTo: redirectTo || "/admin",
-  });
-});
-
-// Logout khusus admin panel (tidak menghapus login Discord)
-app.post("/admin/logout", requireAuth, (req, res) => {
-  if (req.session) {
-    req.session.adminPanelAuthed = false;
-  }
-  const nextUrl = req.body.next || "/dashboard";
-  res.redirect(nextUrl);
-});
-
-// ---------- HOME / LANDING ----------
+// ---------- LANDING / PUBLIC PAGES ----------
 app.get("/", (req, res) => {
   const scriptsPreview = loaderConfig.scripts.slice(0, 3);
   res.render("home", {
     loaderConfig,
     scriptsPreview,
   });
+});
+
+// ---------- ADMIN LOGIN (USERNAME/PASSWORD) ----------
+app.get("/admin/login", (req, res) => {
+  if (isAdmin(req)) {
+    return res.redirect("/admin");
+  }
+
+  res.render("admin-login", {
+    error: null,
+  });
+});
+
+app.post("/admin/login", (req, res) => {
+  const { username, password } = req.body || {};
+
+  if (!ADMIN_USER || !ADMIN_PASS) {
+    return res.status(500).send("Admin login is not configured.");
+  }
+
+  if (username === ADMIN_USER && password === ADMIN_PASS) {
+    req.session.adminUser = {
+      username: ADMIN_USER,
+      loggedInAt: new Date().toISOString(),
+    };
+    return res.redirect("/admin");
+  }
+
+  return res.status(401).render("admin-login", {
+    error: "Username atau password salah",
+  });
+});
+
+app.post("/admin/logout", (req, res) => {
+  if (req.session) {
+    delete req.session.adminUser;
+  }
+  res.redirect("/");
 });
 
 // ---------- SCRIPTS LIST ----------
@@ -332,9 +319,8 @@ app.get("/dashboard", requireAuth, async (req, res) => {
 
   const totalKeys = keys.length;
   const activeKeys = keys.filter(isKeyActive).length;
-  const premiumKeys = keys.filter((k) =>
-    String(k.token || "").startsWith("EXHUBPAID-")
-  ).length;
+  const premiumKeys = keys.filter((k) => String(k.token || "").startsWith("EXHUBPAID-"))
+    .length;
 
   res.render("dashboarddc", {
     user,
@@ -420,24 +406,18 @@ app.get("/get-key/callback", requireAuth, async (req, res) => {
     tier: "free",
   });
 
-  res.redirect(
-    `/get-key?provider=${provider}&newKey=${encodeURIComponent(keyInfo.token)}`
-  );
+  res.redirect(`/get-key?provider=${provider}&newKey=${encodeURIComponent(keyInfo.token)}`);
 });
 
 // ---------- ADMIN DASHBOARD ----------
-app.get("/admin", requireAuth, requireAdminPanelAuth, async (req, res) => {
-  // pastikan Discord ID juga termasuk admin whitelist
-  if (!isAdmin(req)) return res.status(403).send("Forbidden");
-
+app.get("/admin", requireAdmin, async (req, res) => {
   const scripts = loaderConfig.scripts || [];
+  const adminUser = req.session.adminUser || req.session.user || { username: "Admin" };
   res.render("admin-dashboard", {
-    user: req.session.user,
+    user: adminUser,
     scripts,
   });
 });
-
-// (endpoint CRUD script bisa kamu tambah sendiri nanti menggunakan Redis)
 
 // ---------- API: VALIDASI KEY UNTUK LUA LOADER ----------
 app.get("/api/isValidate/:token", async (req, res) => {
@@ -508,8 +488,15 @@ app.use((req, res) => {
   res.status(404).render("api-404");
 });
 
-// ---------- START SERVER (untuk dev lokal) ----------
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`ExHub web running on http://localhost:${PORT}`);
-});
+// ---------- EXPORT UNTUK VERCEL & START LOKAL ----------
+
+// dev lokal: `node server.js`
+if (require.main === module) {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`ExHub web running on http://localhost:${PORT}`);
+  });
+}
+
+// untuk serverless di Vercel
+module.exports = app;

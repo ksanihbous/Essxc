@@ -10,38 +10,66 @@ const { Redis } = require("@upstash/redis");
 
 const app = express();
 
-// ---------- CONFIG BASIC ----------
+/* ========= BASIC CONFIG (loader.json) ========= */
+
 const loaderConfig = require("./config/loader.json");
 
-// Upstash Redis
+/* ========= UPSTASH REDIS / VERCEL KV ========= */
+// Bisa pakai:
+//   UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN
+//   atau fallback dari Vercel KV:
+//   KV_REST_API_URL / KV_REST_API_TOKEN
+
+const REDIS_REST_URL =
+  process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+const REDIS_REST_TOKEN =
+  process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
+
+if (!REDIS_REST_URL || !REDIS_REST_TOKEN) {
+  console.warn(
+    "[WARN] Redis REST env not set. Set UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN atau KV_REST_API_URL + KV_REST_API_TOKEN."
+  );
+}
+
 const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN,
+  url: REDIS_REST_URL,
+  token: REDIS_REST_TOKEN,
 });
 
-// Discord OAuth & bot
+/* ========= DISCORD CONFIG ========= */
+
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 const DISCORD_REDIRECT_URI =
-  process.env.DISCORD_REDIRECT_URI || "https://excwebs.vercel.app/auth/discord/callback";
+  process.env.DISCORD_REDIRECT_URI ||
+  "https://exc-webs.vercel.app/auth/discord/callback"; // default saja (env akan override)
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const DISCORD_GUILD_ID = process.env.DISCORD_GUILD_ID;
 
-// Ads provider URLs (diisi di .env)
-const WORKINK_BASE_URL = process.env.Workink_BASE_URL || "https://work.ink/your-link";
+if (!DISCORD_CLIENT_ID || !DISCORD_CLIENT_SECRET) {
+  console.warn("[WARN] DISCORD_CLIENT_ID / DISCORD_CLIENT_SECRET belum di-set.");
+}
+
+/* ========= ADS PROVIDER CONFIG ========= */
+
+const WORKINK_BASE_URL =
+  process.env.WORKINK_BASE_URL || "https://work.ink/your-link";
 const LINKVERTISE_BASE_URL =
   process.env.LINKVERTISE_BASE_URL || "https://linkvertise.com/your-link";
 
-// Key config
+/* ========= KEY CONFIG ========= */
+
 const KEY_PREFIX = "SIX";
-const KEY_TTL_MS = 3 * 60 * 60 * 1000; // default 3 jam
+const KEY_TTL_MS = 3 * 60 * 60 * 1000; // 3 jam
 const VERIFY_SESSION_TTL_SEC = 10 * 60; // 10 menit
 
-// Admin env credentials
+/* ========= ADMIN USER/PASS (ENV) ========= */
+
 const ADMIN_USER = process.env.ADMIN_USER || "";
 const ADMIN_PASS = process.env.ADMIN_PASS || "";
 
-// ---------- EXPRESS SETUP ----------
+/* ========= EXPRESS SETUP ========= */
+
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
@@ -63,14 +91,15 @@ app.locals.siteName = loaderConfig.siteName;
 app.locals.tagline = loaderConfig.tagline;
 app.locals.loaderUrl = loaderConfig.loader;
 
-// user ke views
+// inject user ke semua view
 app.use((req, res, next) => {
   res.locals.currentUser = req.session.user || null;
   res.locals.adminUser = req.session.adminUser || null;
   next();
 });
 
-// ---------- HELPER FUNCS ----------
+/* ========= HELPER FUNCTIONS ========= */
+
 function requireAuth(req, res, next) {
   if (!req.session.user) {
     const nextUrl = encodeURIComponent(req.originalUrl || "/dashboard");
@@ -83,11 +112,12 @@ function isAdmin(req) {
   // 1) admin login via username/password
   if (req.session && req.session.adminUser) return true;
 
-  // 2) optional Discord id based admin
+  // 2) admin via Discord ID (opsional)
   const adminIds = (process.env.ADMIN_DISCORD_IDS || "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+
   return req.session.user && adminIds.includes(String(req.session.user.id));
 }
 
@@ -118,7 +148,8 @@ function nowMs() {
   return Date.now();
 }
 
-// Redis helpers
+/* ========= REDIS HELPERS ========= */
+
 async function saveKeyForUser({ userId, provider, ip, tier = "free" }) {
   const token = generateKeyToken(tier);
   const createdAt = nowMs();
@@ -135,7 +166,12 @@ async function saveKeyForUser({ userId, provider, ip, tier = "free" }) {
   };
 
   const keyKey = `key:${token}`;
-  await redis.set(keyKey, keyInfo, { px: KEY_TTL_MS + 60 * 60 * 1000 }); // TTL sedikit lebih panjang
+
+  // TTL sedikit lebih panjang dari masa aktif key
+  await redis.set(keyKey, keyInfo, {
+    px: KEY_TTL_MS + 60 * 60 * 1000,
+  });
+
   await redis.lpush(`user:${userId}:keys`, token);
   return keyInfo;
 }
@@ -149,9 +185,9 @@ async function loadUserKeys(userId) {
   if (!userId) return [];
   const tokens = await redis.lrange(`user:${userId}:keys`, 0, -1);
   if (!tokens || tokens.length === 0) return [];
-  const pipeline = tokens.map((t) => redis.get(`key:${t}`));
-  const results = await Promise.all(pipeline);
-  // attach token if missing
+
+  const results = await Promise.all(tokens.map((t) => redis.get(`key:${t}`)));
+
   return results
     .map((info, i) => {
       if (!info) return null;
@@ -167,7 +203,9 @@ function isKeyActive(info) {
   return info.expiresAfter > nowMs();
 }
 
-// ---------- DISCORD AUTH FLOW ----------
+/* ========= DISCORD AUTH FLOW ========= */
+
+// halaman login (tombol "Login dengan Discord")
 app.get("/login", (req, res) => {
   const nextUrl = req.query.next || "/dashboard";
   res.render("discord-login", {
@@ -175,9 +213,11 @@ app.get("/login", (req, res) => {
   });
 });
 
+// redirect ke Discord OAuth
 app.get("/auth/discord", (req, res) => {
   const nextUrl = req.query.next || "/dashboard";
   const state = encodeURIComponent(nextUrl);
+
   const params = new URLSearchParams({
     client_id: DISCORD_CLIENT_ID,
     redirect_uri: DISCORD_REDIRECT_URI,
@@ -186,10 +226,11 @@ app.get("/auth/discord", (req, res) => {
     state,
   });
 
-  const authUrl = `https://discord.com/api/oauth2/authorize?${params.toString()}`;
+  const authUrl = `https://discord.com/oauth2/authorize?${params.toString()}`;
   res.redirect(authUrl);
 });
 
+// callback dari Discord
 app.get("/auth/discord/callback", async (req, res) => {
   const code = req.query.code;
   const state = decodeURIComponent(req.query.state || "/dashboard");
@@ -199,7 +240,7 @@ app.get("/auth/discord/callback", async (req, res) => {
   }
 
   try {
-    // exchange code -> access token
+    // tukar code -> access token
     const tokenRes = await axios.post(
       "https://discord.com/api/oauth2/token",
       new URLSearchParams({
@@ -218,14 +259,14 @@ app.get("/auth/discord/callback", async (req, res) => {
 
     const accessToken = tokenRes.data.access_token;
 
-    // get user info
+    // ambil data user
     const userRes = await axios.get("https://discord.com/api/users/@me", {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
 
     const user = userRes.data;
 
-    // join guild via bot token
+    // auto-join guild via bot (opsional)
     if (DISCORD_GUILD_ID && DISCORD_BOT_TOKEN) {
       try {
         await axios.put(
@@ -234,12 +275,14 @@ app.get("/auth/discord/callback", async (req, res) => {
           { headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` } }
         );
       } catch (err) {
-        // biasanya error kalau sudah join, abaikan
-        console.warn("Failed to add to guild:", err.response?.data || err.message);
+        console.warn(
+          "Failed to add to guild:",
+          err.response?.data || err.message
+        );
       }
     }
 
-    // save ke session
+    // simpan ke session
     req.session.user = {
       id: String(user.id),
       username: user.username,
@@ -259,7 +302,8 @@ app.get("/logout", (req, res) => {
   res.redirect("/");
 });
 
-// ---------- LANDING / PUBLIC PAGES ----------
+/* ========= PUBLIC PAGES ========= */
+
 app.get("/", (req, res) => {
   const scriptsPreview = loaderConfig.scripts.slice(0, 3);
   res.render("home", {
@@ -268,7 +312,13 @@ app.get("/", (req, res) => {
   });
 });
 
-// ---------- ADMIN LOGIN (USERNAME/PASSWORD) ----------
+app.get("/scripts", (req, res) => {
+  const scripts = loaderConfig.scripts || [];
+  res.render("scripts", { scripts, loaderConfig });
+});
+
+/* ========= ADMIN LOGIN (USER/PASS) ========= */
+
 app.get("/admin/login", (req, res) => {
   if (isAdmin(req)) {
     return res.redirect("/admin");
@@ -306,21 +356,17 @@ app.post("/admin/logout", (req, res) => {
   res.redirect("/");
 });
 
-// ---------- SCRIPTS LIST ----------
-app.get("/scripts", (req, res) => {
-  const scripts = loaderConfig.scripts || [];
-  res.render("scripts", { scripts, loaderConfig });
-});
+/* ========= DASHBOARD DISCORD USER ========= */
 
-// ---------- DASHBOARD DISCORD USER ----------
 app.get("/dashboard", requireAuth, async (req, res) => {
   const user = req.session.user;
   const keys = await loadUserKeys(user.id);
 
   const totalKeys = keys.length;
   const activeKeys = keys.filter(isKeyActive).length;
-  const premiumKeys = keys.filter((k) => String(k.token || "").startsWith("EXHUBPAID-"))
-    .length;
+  const premiumKeys = keys.filter((k) =>
+    String(k.token || "").startsWith("EXHUBPAID-")
+  ).length;
 
   res.render("dashboarddc", {
     user,
@@ -333,14 +379,13 @@ app.get("/dashboard", requireAuth, async (req, res) => {
   });
 });
 
-// ---------- GET KEY FLOW ----------
+/* ========= GET KEY FLOW ========= */
+
 app.get("/get-key", requireAuth, async (req, res) => {
   const provider = (req.query.provider || req.query.ads || "workink").toLowerCase();
   const user = req.session.user;
 
   const keys = await loadUserKeys(user.id);
-
-  // baru dari callback
   const newKeyToken = req.query.newKey || null;
 
   res.render("get-key", {
@@ -352,7 +397,7 @@ app.get("/get-key", requireAuth, async (req, res) => {
   });
 });
 
-// Step 1: user klik "Start" -> bikin verify session lalu redirect ke Work.ink / Linkvertise
+// Step 1: buat verify session, redirect ke Ads
 app.post("/get-key/start", requireAuth, async (req, res) => {
   const provider = (req.query.provider || "workink").toLowerCase();
   const user = req.session.user;
@@ -374,14 +419,13 @@ app.post("/get-key/start", requireAuth, async (req, res) => {
   let targetBase = WORKINK_BASE_URL;
   if (provider === "linkvertise") targetBase = LINKVERTISE_BASE_URL;
 
-  // contoh final: https://work.ink/xxx?sid=SESSIONID
   const url = new URL(targetBase);
   url.searchParams.set("sid", sessionId);
 
   res.redirect(url.toString());
 });
 
-// Step 2: provider redirect balik ke sini setelah task selesai
+// Step 2: callback dari Ads
 app.get("/get-key/callback", requireAuth, async (req, res) => {
   const provider = (req.query.provider || "workink").toLowerCase();
   const sid = req.query.sid;
@@ -391,35 +435,46 @@ app.get("/get-key/callback", requireAuth, async (req, res) => {
 
   const verifyKey = `verify:${sid}`;
   const session = await redis.get(verifyKey);
+
   if (!session || session.userId !== user.id || session.provider !== provider) {
     return res.status(400).send("Invalid or expired verification session.");
   }
 
-  // update status & hapus session (opsional)
   await redis.del(verifyKey);
 
-  // bikin key baru
   const keyInfo = await saveKeyForUser({
     userId: user.id,
     provider,
-    ip: req.headers["x-forwarded-for"] || req.socket.remoteAddress || "0.0.0.0",
+    ip:
+      req.headers["x-forwarded-for"] ||
+      req.socket.remoteAddress ||
+      "0.0.0.0",
     tier: "free",
   });
 
-  res.redirect(`/get-key?provider=${provider}&newKey=${encodeURIComponent(keyInfo.token)}`);
+  res.redirect(
+    `/get-key?provider=${provider}&newKey=${encodeURIComponent(
+      keyInfo.token
+    )}`
+  );
 });
 
-// ---------- ADMIN DASHBOARD ----------
+/* ========= ADMIN DASHBOARD ========= */
+
 app.get("/admin", requireAdmin, async (req, res) => {
   const scripts = loaderConfig.scripts || [];
-  const adminUser = req.session.adminUser || req.session.user || { username: "Admin" };
+  const adminUser = req.session.adminUser || req.session.user || {
+    username: "Admin",
+  };
+
   res.render("admin-dashboard", {
     user: adminUser,
     scripts,
   });
 });
 
-// ---------- API: VALIDASI KEY UNTUK LUA LOADER ----------
+/* ========= API: VALIDASI KEY UNTUK LUA LOADER ========= */
+
 app.get("/api/isValidate/:token", async (req, res) => {
   const token = req.params.token;
   res.setHeader("Content-Type", "application/json");
@@ -463,7 +518,8 @@ app.get("/api/isValidate/:token", async (req, res) => {
   });
 });
 
-// ---------- API: LUA LOADER SCRIPT ----------
+/* ========= API: LUA LOADER SCRIPT ========= */
+
 const loaderLuaPath = path.join(__dirname, "scripts", "loader.lua");
 const loaderLuaSource = fs.readFileSync(loaderLuaPath, "utf8");
 
@@ -472,23 +528,24 @@ app.get("/api/script/loader", (req, res) => {
   const ua = (req.headers["user-agent"] || "").toLowerCase();
 
   const looksBrowser =
-    accept.includes("text/html") || ua.includes("mozilla") || ua.includes("chrome");
+    accept.includes("text/html") ||
+    ua.includes("mozilla") ||
+    ua.includes("chrome");
 
-  // kalau kelihatan dari browser -> 404 page ejs
   if (looksBrowser) {
     return res.status(404).render("api-404");
   }
 
-  // kalau dari executor / HttpGet Roblox
   res.type("text/plain").send(loaderLuaSource);
 });
 
-// ---------- 404 FALLBACK ----------
+/* ========= 404 FALLBACK ========= */
+
 app.use((req, res) => {
   res.status(404).render("api-404");
 });
 
-// ---------- EXPORT UNTUK VERCEL & START LOKAL ----------
+/* ========= EXPORT UNTUK VERCEL & START LOKAL ========= */
 
 // dev lokal: `node server.js`
 if (require.main === module) {

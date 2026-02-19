@@ -51,7 +51,7 @@ if (!DISCORD_CLIENT_ID || !DISCORD_CLIENT_SECRET) {
 /* ========= ADS PROVIDER CONFIG ========= */
 
 const WORKINK_BASE_URL =
-  process.envWORKINK_BASE_URL || "https://work.ink/your-link";
+  process.env.WORKINK_BASE_URL || "https://work.ink/your-link";
 const LINKVERTISE_BASE_URL =
   process.env.LINKVERTISE_BASE_URL || "https://linkvertise.com/your-link";
 
@@ -166,6 +166,7 @@ async function saveKeyForUser({ userId, provider, ip, tier = "free" }) {
 
   const keyKey = `key:${token}`;
 
+  // TTL = masa berlaku + 1 jam buffer
   await redis.set(keyKey, keyInfo, {
     px: KEY_TTL_MS + 60 * 60 * 1000,
   });
@@ -199,6 +200,252 @@ function isKeyActive(info) {
   if (!info || info.deleted) return false;
   if (!info.expiresAfter) return false;
   return info.expiresAfter > nowMs();
+}
+
+/* ========= ADMIN KEY STATS & CLEANUP HELPERS ========= */
+
+function isKeyExpired(info) {
+  if (!info) return true;
+  if (info.deleted) return true;
+  if (!info.expiresAfter) return true;
+  return info.expiresAfter <= nowMs();
+}
+
+// Bangun data untuk admin-dashboard: summary + per user
+async function buildAdminKeyStats() {
+  const now = nowMs();
+  const users = [];
+
+  let totalUsers = 0;
+  let totalKeys = 0;
+  let activeKeys = 0;
+  let expiredKeys = 0;
+  let deletedKeys = 0;
+  let orphanTokens = 0;
+
+  // Ambil semua list user:*:keys
+  const listKeys = await redis.keys("user:*:keys");
+
+  for (const listKey of listKeys) {
+    const m = listKey.match(/^user:(.+):keys$/);
+    const userId = m ? m[1] : listKey;
+
+    const tokens = await redis.lrange(listKey, 0, -1);
+    if (!tokens || !tokens.length) continue;
+
+    totalUsers += 1;
+
+    let userTotal = 0;
+    let userActive = 0;
+    let userExpired = 0;
+    let userDeleted = 0;
+    let userOrphan = 0;
+
+    const tokenDetails = [];
+
+    for (const token of tokens) {
+      if (!token) continue;
+      userTotal += 1;
+      totalKeys += 1;
+
+      const info = await redis.get(`key:${token}`);
+
+      if (!info) {
+        orphanTokens += 1;
+        userOrphan += 1;
+        tokenDetails.push({
+          token,
+          missing: true,
+          active: false,
+          expired: true,
+          deleted: false,
+          info: null,
+        });
+        continue;
+      }
+
+      const expired = info.expiresAfter && info.expiresAfter <= now;
+      const deleted = !!info.deleted;
+      const active = !expired && !deleted;
+
+      if (active) {
+        activeKeys += 1;
+        userActive += 1;
+      } else {
+        if (expired) {
+          expiredKeys += 1;
+          userExpired += 1;
+        }
+        if (deleted) {
+          deletedKeys += 1;
+          userDeleted += 1;
+        }
+      }
+
+      tokenDetails.push({
+        token,
+        missing: false,
+        active,
+        expired,
+        deleted,
+        info,
+      });
+    }
+
+    users.push({
+      userId,
+      totalKeys: userTotal,
+      activeKeys: userActive,
+      expiredKeys: userExpired,
+      deletedKeys: userDeleted,
+      orphanTokens: userOrphan,
+      tokens: tokenDetails,
+    });
+  }
+
+  return {
+    summary: {
+      totalUsers,
+      totalKeys,
+      activeKeys,
+      expiredKeys,
+      deletedKeys,
+      orphanTokens,
+    },
+    users,
+  };
+}
+
+// Cleanup: hapus token di list user + (opsional) hapus dokumen key yang expired/deleted/missing
+async function cleanupAllUserKeys() {
+  const now = nowMs();
+  const listKeys = await redis.keys("user:*:keys");
+
+  let scannedTokens = 0;
+  let removedFromLists = 0;
+  let affectedUsers = 0;
+  let deletedKeyDocs = 0;
+
+  for (const listKey of listKeys) {
+    const tokens = await redis.lrange(listKey, 0, -1);
+    if (!tokens || !tokens.length) continue;
+
+    let userRemoved = 0;
+
+    for (const token of tokens) {
+      if (!token) continue;
+      scannedTokens++;
+
+      const keyKey = `key:${token}`;
+      const info = await redis.get(keyKey);
+
+      let shouldRemove = false;
+      let shouldDeleteDoc = false;
+
+      if (!info) {
+        // key di Redis sudah hilang (TTL) => buang dari list user
+        shouldRemove = true;
+      } else {
+        const expired = info.expiresAfter && info.expiresAfter <= now;
+        const deleted = !!info.deleted;
+        if (expired || deleted) {
+          shouldRemove = true;
+          shouldDeleteDoc = true;
+        }
+      }
+
+      if (shouldRemove) {
+        const removedCount = await redis.lrem(listKey, 0, token);
+        if (removedCount > 0) {
+          removedFromLists += removedCount;
+          userRemoved += removedCount;
+        }
+      }
+
+      if (shouldDeleteDoc && info) {
+        const delRes = await redis.del(keyKey);
+        if (delRes) deletedKeyDocs += delRes;
+      }
+    }
+
+    if (userRemoved > 0) {
+      affectedUsers += 1;
+    }
+  }
+
+  return {
+    listKeysCount: listKeys.length,
+    scannedTokens,
+    removedFromLists,
+    affectedUsers,
+    deletedKeyDocs,
+  };
+}
+
+// Hapus SEMUA key milik satu user (hard delete)
+async function deleteAllKeysForUser(userId) {
+  const listKey = `user:${userId}:keys`;
+  const tokens = await redis.lrange(listKey, 0, -1);
+
+  let deletedDocs = 0;
+
+  if (tokens && tokens.length) {
+    for (const token of tokens) {
+      const keyKey = `key:${token}`;
+      const delRes = await redis.del(keyKey);
+      if (delRes) deletedDocs += delRes;
+    }
+  }
+
+  const deletedList = await redis.del(listKey);
+
+  return {
+    userId,
+    deletedDocs,
+    deletedList,
+  };
+}
+
+// Hapus satu key di semua tempat (dokumen key:... + dari list user)
+async function deleteKeyEverywhere(token) {
+  if (!token) {
+    return { ok: false, reason: "missing token" };
+  }
+
+  const keyKey = `key:${token}`;
+  const info = await redis.get(keyKey);
+
+  let userId = info && info.userId ? info.userId : null;
+  let removedFromList = 0;
+
+  // Kalau userId tidak ada di dokumen, cari di list user:*:keys
+  if (!userId) {
+    const listKeys = await redis.keys("user:*:keys");
+    for (const listKey of listKeys) {
+      const tokens = await redis.lrange(listKey, 0, -1);
+      if (tokens && tokens.includes(token)) {
+        const m = listKey.match(/^user:(.+):keys$/);
+        if (m) {
+          userId = m[1];
+          break;
+        }
+      }
+    }
+  }
+
+  if (userId) {
+    const listKey = `user:${userId}:keys`;
+    removedFromList = await redis.lrem(listKey, 0, token);
+  }
+
+  const deletedDoc = await redis.del(keyKey);
+
+  return {
+    ok: true,
+    userId: userId || null,
+    removedFromList,
+    deletedDoc,
+  };
 }
 
 /* ========= BROWSER & EXECUTOR DETECTION UNTUK /api/script/loader ========= */
@@ -238,7 +485,6 @@ function looksLikeRealBrowser(req) {
 }
 
 // Deteksi request yang datang dari client Roblox (executor apa pun yang berjalan di dalam Roblox)
-// Mayoritas executor Roblox akan punya UA yang mengandung "roblox".
 function isRobloxUserAgent(req) {
   const ua = (req.headers["user-agent"] || "").toLowerCase();
   return ua.includes("roblox");
@@ -410,7 +656,7 @@ app.post("/admin/logout", (req, res) => {
   res.redirect("/");
 });
 
-/* ========= DASHBOARD ========= */
+/* ========= USER DASHBOARD (DISCORD USER) ========= */
 
 app.get("/dashboard", requireAuth, async (req, res) => {
   const user = req.session.user;
@@ -437,7 +683,11 @@ app.get("/dashboard", requireAuth, async (req, res) => {
 
 // GET: tampilan pilih provider & list key
 app.get("/get-key", requireAuth, async (req, res) => {
-  const provider = (req.query.provider || req.query.ads || "workink").toLowerCase();
+  const provider = (
+    req.query.provider ||
+    req.query.ads ||
+    "workink"
+  ).toLowerCase();
   const user = req.session.user;
 
   const keys = await loadUserKeys(user.id);
@@ -525,10 +775,114 @@ app.get("/admin", requireAdmin, async (req, res) => {
     username: "Admin",
   };
 
+  let keyStats = null;
+  try {
+    keyStats = await buildAdminKeyStats();
+  } catch (err) {
+    console.error("Failed to build admin key stats:", err);
+    keyStats = null;
+  }
+
+  const cleanupSummary = req.session.cleanupSummary || null;
+  if (req.session.cleanupSummary) {
+    delete req.session.cleanupSummary;
+  }
+
   res.render("admin-dashboard", {
     user: adminUser,
     scripts,
+    keyStats,
+    cleanupSummary,
   });
+});
+
+/* ========= ADMIN: CLEANUP KEYS (GLOBAL) ========= */
+
+app.post("/admin/cleanup-keys", requireAdmin, async (req, res) => {
+  try {
+    const result = await cleanupAllUserKeys();
+    req.session.cleanupSummary = {
+      type: "success",
+      message: `Cleanup selesai: scanned=${result.scannedTokens}, removedFromLists=${result.removedFromLists}, deletedKeyDocs=${result.deletedKeyDocs}, affectedUsers=${result.affectedUsers}`,
+      result,
+    };
+  } catch (err) {
+    console.error("Failed to cleanup keys:", err);
+    req.session.cleanupSummary = {
+      type: "error",
+      message: "Cleanup keys gagal: " + err.message,
+    };
+  }
+  res.redirect("/admin");
+});
+
+/* ========= ADMIN: DELETE SATU KEY ========= */
+
+app.post("/admin/delete-key", requireAdmin, async (req, res) => {
+  const token = (req.body.token || "").trim();
+
+  if (!token) {
+    req.session.cleanupSummary = {
+      type: "error",
+      message: "Token tidak boleh kosong.",
+    };
+    return res.redirect("/admin");
+  }
+
+  try {
+    const result = await deleteKeyEverywhere(token);
+    if (!result.ok) {
+      req.session.cleanupSummary = {
+        type: "error",
+        message: "Gagal menghapus key: " + (result.reason || "unknown"),
+      };
+    } else {
+      req.session.cleanupSummary = {
+        type: "success",
+        message: `Key ${token} berhasil dihapus. userId=${result.userId ||
+          "unknown"}, removedFromList=${result.removedFromList}, deletedDoc=${result.deletedDoc}`,
+      };
+    }
+  } catch (err) {
+    console.error("Failed to delete key:", err);
+    req.session.cleanupSummary = {
+      type: "error",
+      message: "Gagal menghapus key: " + err.message,
+    };
+  }
+
+  res.redirect("/admin");
+});
+
+/* ========= ADMIN: DELETE SEMUA KEY USER ========= */
+
+app.post("/admin/delete-user-keys", requireAdmin, async (req, res) => {
+  const userId = (req.body.userId || "").trim();
+
+  if (!userId) {
+    req.session.cleanupSummary = {
+      type: "error",
+      message: "userId tidak boleh kosong.",
+    };
+    return res.redirect("/admin");
+  }
+
+  try {
+    const result = await deleteAllKeysForUser(userId);
+    req.session.cleanupSummary = {
+      type: "success",
+      message: `Semua key untuk user ${userId} dihapus. deletedDocs=${result.deletedDocs}, deletedList=${result.deletedList}`,
+      result,
+    };
+  } catch (err) {
+    console.error("Failed to delete all keys for user:", err);
+    req.session.cleanupSummary = {
+      type: "error",
+      message: "Gagal menghapus semua key user: " + err.message,
+    };
+  }
+
+  res.redirect("/admin");
 });
 
 /* ========= API: VALIDASI KEY ========= */

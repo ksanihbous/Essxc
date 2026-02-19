@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <title>Admin Dashboard - <%= siteName || 'ExHub' %></title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="/public/css/main.css" />
+  <link rel="icon" type="image/png" href="/public/img/logo-exhub.png" />
   <script src="/public/js/protect.js" defer></script>
 </head>
 <body class="page-dark">
@@ -17,8 +19,8 @@
         <div>
           <h1>Admin Dashboard</h1>
           <p>
-            Only Discord IDs in <code>ADMIN_DISCORD_IDS</code> or valid
-            <code>ADMIN_USER / ADMIN_PASS</code> can access this page.
+            Only Discord IDs in <code>ADMIN_DISCORD_IDS</code> atau kredensial
+            <code>ADMIN_USER / ADMIN_PASS</code> yang valid bisa mengakses halaman ini.
           </p>
         </div>
       </div>
@@ -92,7 +94,7 @@
     <section class="card">
       <h2>Admin Actions</h2>
       <p class="helper-text">
-        Aksi cepat untuk maintenance key & user. Gunakan dengan hati-hati karena beberapa aksi bersifat permanen.
+        Aksi cepat untuk maintenance key & user. Beberapa aksi bersifat permanen, gunakan dengan hati-hati.
       </p>
 
       <div class="admin-actions-grid">
@@ -105,8 +107,30 @@
             <code>user:*:keys</code> dan menghapus doc <code>key:token</code> yang tidak diperlukan.
           </p>
           <form action="/admin/cleanup-keys" method="post">
-            <button type="submit" class="btn btn-primary">
-              Run Cleanup
+            <button
+              type="submit"
+              class="btn btn-primary"
+              onclick="return confirm('Jalankan cleanup semua key expired/deleted/orphan?');"
+            >
+              Run Cleanup Keys
+            </button>
+          </form>
+        </div>
+
+        <!-- NEW: Cleanup Users (hapus user:*:keys tanpa key aktif) -->
+        <div class="admin-action-card">
+          <h3>Cleanup Users</h3>
+          <p>
+            Menghapus entry <code>user:*:keys</code> untuk user yang <strong>tidak punya key aktif sama sekali</strong>.
+            Key yang sudah expired / deleted tetap dihapus dari list user.
+          </p>
+          <form action="/admin/cleanup-users" method="post">
+            <button
+              type="submit"
+              class="btn btn-outline"
+              onclick="return confirm('Hapus semua user list yang tidak punya key aktif?');"
+            >
+              Run Cleanup Users
             </button>
           </form>
         </div>
@@ -123,10 +147,14 @@
               type="text"
               name="userId"
               class="input"
-              placeholder="Discord userId (contoh: 1234567890)"
+              placeholder="Discord userId (contoh: 1188338848523xxxx)"
               required
             />
-            <button type="submit" class="btn btn-danger">
+            <button
+              type="submit"
+              class="btn btn-danger"
+              onclick="return confirm('Yakin hapus SEMUA key untuk user ini?');"
+            >
               Delete User Keys
             </button>
           </form>
@@ -146,7 +174,11 @@
               placeholder="EXHUBFREE-XXXXYYYY-XXXX-XXXX"
               required
             />
-            <button type="submit" class="btn btn-danger">
+            <button
+              type="submit"
+              class="btn btn-danger"
+              onclick="return confirm('Yakin hapus key ini?');"
+            >
               Delete Key
             </button>
           </form>
@@ -193,7 +225,11 @@
                 <div>
                   <form action="/admin/delete-user-keys" method="post">
                     <input type="hidden" name="userId" value="<%= u.userId %>" />
-                    <button type="submit" class="btn btn-danger btn-sm">
+                    <button
+                      type="submit"
+                      class="btn btn-danger btn-sm"
+                      onclick="return confirm('Hapus semua key untuk user <%= u.userId %>?');"
+                    >
                       Delete All Keys for This User
                     </button>
                   </form>
@@ -216,7 +252,7 @@
                     </thead>
                     <tbody>
                       <% u.tokens.forEach(function(t) { %>
-                        <% 
+                        <%
                           var statusClass = '';
                           var statusText = '';
 
@@ -267,7 +303,11 @@
                           <td>
                             <form action="/admin/delete-key" method="post">
                               <input type="hidden" name="token" value="<%= t.token %>" />
-                              <button type="submit" class="btn btn-outline btn-sm">
+                              <button
+                                type="submit"
+                                class="btn btn-outline btn-sm"
+                                onclick="return confirm('Hapus key <%= t.token %>?');"
+                              >
                                 Delete
                               </button>
                             </form>
@@ -310,7 +350,7 @@
             </tr>
           </thead>
           <tbody>
-            <% scripts.forEach(function(s) { %>
+            <% (scripts || []).forEach(function(s) { %>
               <tr>
                 <td><code><%= s.id %></code></td>
                 <td><%= s.name %></td>

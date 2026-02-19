@@ -88,6 +88,7 @@ app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.use("/public", express.static(path.join(__dirname, "public")));
 
+/* globals untuk semua view (fallback) */
 app.locals.siteName = loaderConfig.siteName;
 app.locals.tagline = loaderConfig.tagline;
 app.locals.loaderUrl = loaderConfig.loader;
@@ -125,7 +126,9 @@ function isAdmin(req) {
     .map((s) => s.trim())
     .filter(Boolean);
 
-  return req.session.user && adminIds.includes(String(req.session.user.id));
+  return !!(req.session &&
+    req.session.user &&
+    adminIds.includes(String(req.session.user.id)));
 }
 
 function requireAdmin(req, res, next) {
@@ -553,6 +556,7 @@ app.get("/login", (req, res) => {
     typeof req.query.next === "string" && req.query.next.trim()
       ? req.query.next
       : "/dashboard";
+
   res.render("discord-login", {
     nextUrl: nextParam,
   });
@@ -686,7 +690,7 @@ app.get("/admin/login", (req, res) => {
       : "/admin";
 
   res.render("admin-login", {
-    errorMessage: null,
+    error: null,
     redirectTo,
   });
 });
@@ -699,8 +703,13 @@ app.post("/admin/login", (req, res) => {
       ? redirectTo
       : "/admin";
 
+  // Kalau env belum di-set, render halaman dengan pesan error yang jelas
   if (!ADMIN_USER || !ADMIN_PASS) {
-    return res.status(500).send("Admin login is not configured.");
+    return res.status(500).render("admin-login", {
+      error:
+        "Admin login belum dikonfigurasi. Set environment variables ADMIN_USER dan ADMIN_PASS di Vercel.",
+      redirectTo: target,
+    });
   }
 
   if (username === ADMIN_USER && password === ADMIN_PASS) {
@@ -712,7 +721,7 @@ app.post("/admin/login", (req, res) => {
   }
 
   return res.status(401).render("admin-login", {
-    errorMessage: "Username atau password salah",
+    error: "Username atau password salah.",
     redirectTo: target,
   });
 });

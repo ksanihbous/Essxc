@@ -2,49 +2,333 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Admin Dashboard - <%= siteName %></title>
+  <title>Admin Dashboard - <%= siteName || 'ExHub' %></title>
   <link rel="stylesheet" href="/public/css/main.css" />
   <script src="/public/js/protect.js" defer></script>
 </head>
 <body class="page-dark">
-<%- include('partials/nav', { active: 'admin' }) %>
+  <%- include('partials/nav', { active: 'admin' }) %>
 
-<main class="container">
-  <section class="page-header">
-    <h1>Admin Dashboard</h1>
-    <p>Only Discord IDs in <code>ADMIN_DISCORD_IDS</code> can access this page.</p>
-  </section>
+  <main class="container">
 
-  <section class="card">
-    <h2>Scripts Config (read-only)</h2>
-    <p class="helper-text">
-      This table is loaded from <code>config/loader.json</code>. You can extend this page to save
-      changes into Redis so it updates without redeploy.
-    </p>
+    <!-- Page Header -->
+    <section class="page-header">
+      <div class="page-header-main">
+        <div>
+          <h1>Admin Dashboard</h1>
+          <p>
+            Only Discord IDs in <code>ADMIN_DISCORD_IDS</code> or valid
+            <code>ADMIN_USER / ADMIN_PASS</code> can access this page.
+          </p>
+        </div>
+      </div>
 
-    <table class="keys-table">
-      <thead>
-      <tr>
-        <th>ID</th>
-        <th>Name</th>
-        <th>Version</th>
-        <th>Status</th>
-        <th>Game URL</th>
-      </tr>
-      </thead>
-      <tbody>
-      <% scripts.forEach(function(s) { %>
-        <tr>
-          <td><code><%= s.id %></code></td>
-          <td><%= s.name %></td>
-          <td><%= s.version %></td>
-          <td><%= s.status %></td>
-          <td><a href="<%= s.gameUrl %>" target="_blank">open</a></td>
-        </tr>
-      <% }) %>
-      </tbody>
-    </table>
-  </section>
-</main>
+      <div class="admin-info-bar">
+        <div>
+          <span class="admin-label">Logged in as:</span>
+          <span class="admin-name"><%= user && user.username ? user.username : 'Admin' %></span>
+        </div>
+        <form action="/admin/logout" method="post">
+          <button type="submit" class="btn btn-outline btn-sm">Logout</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Alert / flash message dari cleanupSummary -->
+    <% if (cleanupSummary) { %>
+      <section class="alert <%= cleanupSummary.type === 'error' ? 'alert-error' : 'alert-success' %>">
+        <div class="alert-title">
+          <%= cleanupSummary.type === 'error' ? 'Action Failed' : 'Action Succeeded' %>
+        </div>
+        <p><%= cleanupSummary.message %></p>
+      </section>
+    <% } %>
+
+    <!-- Key Stats Summary -->
+    <% if (keyStats && keyStats.summary) { %>
+      <section class="card">
+        <h2>Key Statistics</h2>
+        <p class="helper-text">
+          Statistik global untuk semua user dan key yang terdata di Redis / KV.
+        </p>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Total Users</div>
+            <div class="stat-value"><%= keyStats.summary.totalUsers || 0 %></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Keys</div>
+            <div class="stat-value"><%= keyStats.summary.totalKeys || 0 %></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Active Keys</div>
+            <div class="stat-value stat-value-success"><%= keyStats.summary.activeKeys || 0 %></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Expired Keys</div>
+            <div class="stat-value stat-value-warning"><%= keyStats.summary.expiredKeys || 0 %></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Deleted Keys</div>
+            <div class="stat-value stat-value-danger"><%= keyStats.summary.deletedKeys || 0 %></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Orphan Tokens</div>
+            <div class="stat-value stat-value-muted"><%= keyStats.summary.orphanTokens || 0 %></div>
+          </div>
+        </div>
+      </section>
+    <% } else { %>
+      <section class="card">
+        <h2>Key Statistics</h2>
+        <p class="helper-text">
+          Tidak dapat memuat statistik key. Cek koneksi Redis / KV atau log server.
+        </p>
+      </section>
+    <% } %>
+
+    <!-- Admin Actions -->
+    <section class="card">
+      <h2>Admin Actions</h2>
+      <p class="helper-text">
+        Aksi cepat untuk maintenance key & user. Gunakan dengan hati-hati karena beberapa aksi bersifat permanen.
+      </p>
+
+      <div class="admin-actions-grid">
+
+        <!-- Cleanup All Expired / Deleted / Orphan Keys -->
+        <div class="admin-action-card">
+          <h3>Cleanup Keys</h3>
+          <p>
+            Menghapus token yang sudah expired / deleted / orphan dari list
+            <code>user:*:keys</code> dan menghapus doc <code>key:token</code> yang tidak diperlukan.
+          </p>
+          <form action="/admin/cleanup-keys" method="post">
+            <button type="submit" class="btn btn-primary">
+              Run Cleanup
+            </button>
+          </form>
+        </div>
+
+        <!-- Delete all keys for a given user -->
+        <div class="admin-action-card">
+          <h3>Delete All Keys for User</h3>
+          <p>
+            Hapus semua key untuk satu user (berdasarkan Discord <code>userId</code>).
+            Termasuk list <code>user:userId:keys</code> dan semua doc <code>key:token</code>-nya.
+          </p>
+          <form action="/admin/delete-user-keys" method="post" class="form-inline">
+            <input
+              type="text"
+              name="userId"
+              class="input"
+              placeholder="Discord userId (contoh: 1234567890)"
+              required
+            />
+            <button type="submit" class="btn btn-danger">
+              Delete User Keys
+            </button>
+          </form>
+        </div>
+
+        <!-- Delete single key -->
+        <div class="admin-action-card">
+          <h3>Delete Single Key</h3>
+          <p>
+            Hapus satu key tertentu di semua tempat (doc <code>key:token</code> dan dari list user).
+          </p>
+          <form action="/admin/delete-key" method="post" class="form-inline">
+            <input
+              type="text"
+              name="token"
+              class="input"
+              placeholder="EXHUBFREE-XXXXYYYY-XXXX-XXXX"
+              required
+            />
+            <button type="submit" class="btn btn-danger">
+              Delete Key
+            </button>
+          </form>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Users & Keys Management -->
+    <section class="card">
+      <h2>Users & Keys Management</h2>
+      <p class="helper-text">
+        Daftar user yang memiliki key. Setiap user menampilkan ringkasan key dan detail token.
+      </p>
+
+      <% if (keyStats && keyStats.users && keyStats.users.length > 0) { %>
+        <div class="users-list">
+          <% keyStats.users.forEach(function(u) { %>
+            <div class="user-card">
+              <div class="user-card-header">
+                <div>
+                  <div class="user-id">
+                    User ID:
+                    <code><%= u.userId %></code>
+                  </div>
+                  <div class="user-stats">
+                    <span class="badge badge-muted">
+                      Total: <strong><%= u.totalKeys %></strong>
+                    </span>
+                    <span class="badge badge-success">
+                      Active: <strong><%= u.activeKeys %></strong>
+                    </span>
+                    <span class="badge badge-warning">
+                      Expired: <strong><%= u.expiredKeys %></strong>
+                    </span>
+                    <span class="badge badge-danger">
+                      Deleted: <strong><%= u.deletedKeys %></strong>
+                    </span>
+                    <span class="badge badge-outline">
+                      Orphan: <strong><%= u.orphanTokens %></strong>
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <form action="/admin/delete-user-keys" method="post">
+                    <input type="hidden" name="userId" value="<%= u.userId %>" />
+                    <button type="submit" class="btn btn-danger btn-sm">
+                      Delete All Keys for This User
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              <% if (u.tokens && u.tokens.length > 0) { %>
+                <div class="table-wrapper">
+                  <table class="keys-table">
+                    <thead>
+                      <tr>
+                        <th>Token</th>
+                        <th>Status</th>
+                        <th>Provider</th>
+                        <th>IP</th>
+                        <th>Created At</th>
+                        <th>Expires At</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <% u.tokens.forEach(function(t) { %>
+                        <% 
+                          var statusClass = '';
+                          var statusText = '';
+
+                          if (t.missing) {
+                            statusClass = 'badge-muted';
+                            statusText = 'Missing (doc expired)';
+                          } else if (t.deleted) {
+                            statusClass = 'badge-danger';
+                            statusText = 'Deleted';
+                          } else if (t.expired) {
+                            statusClass = 'badge-warning';
+                            statusText = 'Expired';
+                          } else if (t.active) {
+                            statusClass = 'badge-success';
+                            statusText = 'Active';
+                          } else {
+                            statusClass = 'badge-outline';
+                            statusText = 'Unknown';
+                          }
+
+                          var createdAt = t.info && t.info.createdAt
+                            ? new Date(t.info.createdAt).toLocaleString()
+                            : '-';
+
+                          var expiresAt = t.info && t.info.expiresAfter
+                            ? new Date(t.info.expiresAfter).toLocaleString()
+                            : '-';
+
+                          var provider = t.info && t.info.provider
+                            ? t.info.provider
+                            : '-';
+
+                          var ip = t.info && t.info.byIp
+                            ? t.info.byIp
+                            : '-';
+                        %>
+                        <tr>
+                          <td><code><%= t.token %></code></td>
+                          <td>
+                            <span class="badge <%= statusClass %>">
+                              <%= statusText %>
+                            </span>
+                          </td>
+                          <td><%= provider %></td>
+                          <td><%= ip %></td>
+                          <td><%= createdAt %></td>
+                          <td><%= expiresAt %></td>
+                          <td>
+                            <form action="/admin/delete-key" method="post">
+                              <input type="hidden" name="token" value="<%= t.token %>" />
+                              <button type="submit" class="btn btn-outline btn-sm">
+                                Delete
+                              </button>
+                            </form>
+                          </td>
+                        </tr>
+                      <% }) %>
+                    </tbody>
+                  </table>
+                </div>
+              <% } else { %>
+                <p class="helper-text">User ini tidak memiliki token yang tersisa.</p>
+              <% } %>
+            </div>
+          <% }) %>
+        </div>
+      <% } else { %>
+        <p class="helper-text">
+          Belum ada user yang menyimpan key, atau gagal memuat data dari Redis.
+        </p>
+      <% } %>
+    </section>
+
+    <!-- Scripts Config (read-only) -->
+    <section class="card">
+      <h2>Scripts Config (read-only)</h2>
+      <p class="helper-text">
+        Tabel ini dibaca dari <code>config/loader.json</code>. Jika ingin, kamu bisa
+        extend halaman ini untuk menyimpan perubahan ke Redis agar update tanpa redeploy.
+      </p>
+
+      <div class="table-wrapper">
+        <table class="keys-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Version</th>
+              <th>Status</th>
+              <th>Game URL</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% scripts.forEach(function(s) { %>
+              <tr>
+                <td><code><%= s.id %></code></td>
+                <td><%= s.name %></td>
+                <td><%= s.version %></td>
+                <td><%= s.status %></td>
+                <td>
+                  <% if (s.gameUrl) { %>
+                    <a href="<%= s.gameUrl %>" target="_blank" rel="noopener noreferrer">open</a>
+                  <% } else { %>
+                    <span class="helper-text">-</span>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
 </body>
 </html>

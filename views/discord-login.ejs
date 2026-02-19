@@ -3,27 +3,29 @@
 <head>
   <meta charset="UTF-8" />
   <title>Discord Login - <%= siteName || 'ExHub' %></title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="/public/css/main.css" />
   <link rel="icon" type="image/png" href="/public/img/logo-exhub.png" />
   <script src="/public/js/protect.js" defer></script>
 </head>
 <body class="page-dark">
-  <div class="center-wrap">
-    <div class="card">
-      <div class="card-header">
-        <!-- Logo Discord kecil -->
+  <main class="center-wrap">
+    <div class="card" style="max-width:420px;width:100%;">
+      <div class="card-header" style="text-align:center;margin-bottom:12px;">
         <img
           src="/public/img/logo-discord.png"
           class="discord-logo-sm"
-          style="width:64px;height:64px;object-fit:contain;"
           alt="Discord"
+          style="width:64px;height:64px;object-fit:contain;margin-bottom:8px;"
         />
-        <h1>Login with Discord</h1>
-        <p>We use Discord to bind your keys and protect against abuse.</p>
+        <h1 style="margin:0 0 6px;">Login with Discord</h1>
+        <p class="helper-text" style="margin:0;">
+          We use Discord to bind your keys and protect against abuse.
+        </p>
       </div>
 
       <div class="card-body">
-        <% 
+        <%
           const targetNext = nextUrl || '/dashboard';
           const nextParam = 'next=' + encodeURIComponent(targetNext);
         %>
@@ -35,12 +37,16 @@
           Login with Discord
         </a>
 
-        <p class="helper-text">
+        <p class="helper-text" style="margin-top:10px;font-size:12px;text-align:center;">
           After login you will be redirected back to:
           <code><%= targetNext %></code>
         </p>
       </div>
     </div>
-  </div>
+  </main>
+
+  <footer class="footer">
+    <span>© <%= new Date().getFullYear() %> <%= siteName || 'ExHub' %></span>
+  </footer>
 </body>
 </html>

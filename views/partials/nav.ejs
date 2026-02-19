@@ -8,18 +8,57 @@
       </div>
     </a>
   </div>
+
   <nav class="nav-links">
-    <a href="/" class="nav-link <%= active === 'home' ? 'nav-link-active' : '' %>">Home</a>
-    <a href="/get-key?provider=linkvertise" class="nav-link <%= active === 'get-key' ? 'nav-link-active' : '' %>">Get Key</a>
-    <a href="/scripts" class="nav-link <%= active === 'scripts' ? 'nav-link-active' : '' %>">Scripts</a>
+    <a
+      href="/"
+      class="nav-link <%= active === 'home' ? 'nav-link-active' : '' %>"
+    >
+      Home
+    </a>
+
+    <a
+      href="/get-key?provider=linkvertise"
+      class="nav-link <%= active === 'get-key' ? 'nav-link-active' : '' %>"
+    >
+      Get Key
+    </a>
+
+    <a
+      href="/scripts"
+      class="nav-link <%= active === 'scripts' ? 'nav-link-active' : '' %>"
+    >
+      Scripts
+    </a>
+
     <% if (currentUser) { %>
-      <a href="/dashboard" class="nav-link <%= active === 'dashboard' ? 'nav-link-active' : '' %>">Dashboard</a>
-      <% if (currentUser && currentUser.id) { %>
-        <a href="/admin" class="nav-link <%= active === 'admin' ? 'nav-link-active' : '' %>">Admin</a>
+      <a
+        href="/dashboard"
+        class="nav-link <%= active === 'dashboard' ? 'nav-link-active' : '' %>"
+      >
+        Dashboard
+      </a>
+
+      <% /* Tampilkan Admin hanya jika isAdminNav = true (ADMIN_DISCORD_IDS atau adminUser) */ %>
+      <% if (typeof isAdminNav !== 'undefined' && isAdminNav) { %>
+        <a
+          href="/admin"
+          class="nav-link <%= active === 'admin' ? 'nav-link-active' : '' %>"
+        >
+          Admin
+        </a>
       <% } %>
-      <a href="/logout" class="nav-link nav-link-ghost">Logout</a>
+
+      <a href="/logout" class="nav-link nav-link-ghost">
+        Logout
+      </a>
     <% } else { %>
-      <a href="/login" class="nav-link nav-link-ghost">Login</a>
+      <a
+        href="/login"
+        class="nav-link nav-link-ghost <%= active === 'login' ? 'nav-link-active' : '' %>"
+      >
+        Login
+      </a>
     <% } %>
   </nav>
 </header>

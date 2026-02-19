@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>Get Key - <%= siteName || 'ExHub' %></title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="/public/css/main.css" />
   <link rel="icon" type="image/png" href="/public/img/logo-exhub.png" />
   <script src="/public/js/protect.js" defer></script>
@@ -11,26 +12,28 @@
   <%- include('partials/nav', { active: 'get-key' }) %>
 
   <main class="container">
-    <% 
+    <%
       // Nama cantik untuk provider
       const providerName = provider === 'linkvertise' ? 'Linkvertise' : 'Work.ink';
     %>
 
+    <!-- HEADER -->
     <section class="page-header">
       <h1>Complete Verification</h1>
       <p>
-        Complete a quick verification with 
-        <span class="accent"><%= providerName %></span> 
+        Complete a quick verification with
+        <span class="accent"><%= providerName %></span>
         to get your key and start using our scripts.
       </p>
     </section>
 
-    <!-- Provider switcher -->
-    <section class="card" style="margin-bottom:1.5rem;">
+    <!-- PROVIDER SWITCH -->
+    <section class="card" style="margin-bottom: 1.5rem;">
       <div class="card-header-row">
         <h2>Select Provider</h2>
         <span class="badge badge-soft">Step 1</span>
       </div>
+
       <div class="provider-switch" style="display:flex;gap:0.75rem;flex-wrap:wrap;">
         <a
           href="/get-key?provider=workink"
@@ -45,14 +48,15 @@
           Linkvertise
         </a>
       </div>
-      <p class="helper-text" style="margin-top:0.5rem;">
+
+      <p class="helper-text" style="margin-top: 0.5rem;">
         You can use any provider you like. Verification is one-time per key and
         bound to your Discord account.
       </p>
     </section>
 
     <section class="grid-2">
-      <!-- LEFT: Verification + New Key -->
+      <!-- LEFT: VERIFICATION + NEW KEY -->
       <div class="card">
         <div class="card-header-row">
           <h2>Verification</h2>
@@ -72,10 +76,10 @@
         </form>
 
         <% if (newKeyToken) { %>
-          <div class="alert alert-success" style="margin-top:1rem;">
+          <div class="alert alert-success" style="margin-top: 1rem;">
             <strong>New Key Generated:</strong><br />
             <code><%= newKeyToken %></code>
-            <p style="margin-top:0.5rem;">
+            <p style="margin-top: 0.5rem;">
               Copy this key into your Roblox loader UI. You can always see it again in Dashboard
               or in the list on the right.
             </p>
@@ -83,7 +87,7 @@
         <% } %>
       </div>
 
-      <!-- RIGHT: Existing keys -->
+      <!-- RIGHT: EXISTING KEYS -->
       <div class="card">
         <div class="card-header-row">
           <h2>Your Keys</h2>
@@ -97,50 +101,52 @@
             No keys yet. Complete a verification to generate your first key.
           </p>
         <% } else { %>
-          <table class="keys-table">
-            <thead>
-              <tr>
-                <th>Key</th>
-                <th>Provider</th>
-                <th>Time Left</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% 
-                const now = Date.now();
-                keys.forEach(function(k) { 
-                  const expiresAt = k.expiresAfter || 0;
-                  const leftMs = expiresAt - now;
-                  const leftSec = Math.max(0, Math.floor(leftMs / 1000));
-                  const hours = Math.floor(leftSec / 3600);
-                  const mins = Math.floor((leftSec % 3600) / 60);
-                  const isExpired = k.deleted || !expiresAt || expiresAt <= now;
-                  const status = isExpired ? 'Expired' : 'Active';
-              %>
+          <div class="table-wrapper">
+            <table class="keys-table">
+              <thead>
                 <tr>
-                  <td><code class="mono"><%= k.token %></code></td>
-                  <td><%= k.provider || '-' %></td>
-                  <td>
-                    <% if (isExpired) { %>
-                      00:00
-                    <% } else { %>
-                      <%= hours.toString().padStart(2,'0') %>:<%= mins.toString().padStart(2,'0') %>
-                    <% } %>
-                  </td>
-                  <td>
-                    <span
-                      class="status-pill <%= status === 'Active'
-                                             ? 'status-working'
-                                             : 'status-maint' %>"
-                    >
-                      <%= status %>
-                    </span>
-                  </td>
+                  <th>Key</th>
+                  <th>Provider</th>
+                  <th>Time Left</th>
+                  <th>Status</th>
                 </tr>
-              <% }) %>
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                <%
+                  const now = Date.now();
+                  keys.forEach(function(k) {
+                    const expiresAt = k.expiresAfter || 0;
+                    const leftMs = expiresAt - now;
+                    const leftSec = Math.max(0, Math.floor(leftMs / 1000));
+                    const hours = Math.floor(leftSec / 3600);
+                    const mins = Math.floor((leftSec % 3600) / 60);
+                    const isExpired = k.deleted || !expiresAt || expiresAt <= now;
+                    const status = isExpired ? 'Expired' : 'Active';
+                %>
+                  <tr>
+                    <td><code class="mono"><%= k.token %></code></td>
+                    <td><%= k.provider || '-' %></td>
+                    <td>
+                      <% if (isExpired) { %>
+                        00:00
+                      <% } else { %>
+                        <%= hours.toString().padStart(2,'0') %>:<%= mins.toString().padStart(2,'0') %>
+                      <% } %>
+                    </td>
+                    <td>
+                      <span
+                        class="status-pill <%= status === 'Active'
+                                               ? 'status-working'
+                                               : 'status-maint' %>"
+                      >
+                        <%= status %>
+                      </span>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
         <% } %>
       </div>
     </section>

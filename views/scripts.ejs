@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>Scripts - <%= siteName || 'ExHub' %></title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="/public/css/main.css" />
   <link rel="icon" type="image/png" href="/public/img/logo-exhub.png" />
   <script src="/public/js/protect.js" defer></script>
@@ -11,6 +12,7 @@
   <%- include('partials/nav', { active: 'scripts' }) %>
 
   <main class="container">
+    <!-- HEADER -->
     <section class="page-header">
       <h1>Supported Games</h1>
       <p>
@@ -19,62 +21,80 @@
       </p>
     </section>
 
-    <section class="scripts-grid">
-      <% scripts.forEach(function(s) { %>
-        <article class="script-card">
-          <img
-            src="<%= s.thumbnail %>"
-            alt="<%= s.name %>"
-            class="script-card-thumb"
-          />
+    <!-- SCRIPT CARDS -->
+    <% if (!scripts || !scripts.length) { %>
+      <section class="card">
+        <h2>No scripts yet</h2>
+        <p class="helper-text">
+          There are no scripts configured in <code>config/loader.json</code>.
+          Add some entries and redeploy, then refresh this page.
+        </p>
+      </section>
+    <% } else { %>
+      <section class="scripts-grid">
+        <% scripts.forEach(function(s) { %>
+          <article class="script-card">
+            <img
+              src="<%= s.thumbnail %>"
+              alt="<%= s.name %>"
+              class="script-card-thumb"
+            />
 
-          <div class="script-card-body">
-            <div class="script-card-header">
-              <h2><%= s.name %></h2>
-              <span class="script-version"><%= s.version %></span>
+            <div class="script-card-body">
+              <div class="script-card-header">
+                <h2><%= s.name %></h2>
+                <span class="script-version"><%= s.version %></span>
+              </div>
+
+              <p class="script-desc"><%= s.description %></p>
+
+              <div class="script-meta-row">
+                <span class="status-pill <%= s.status === 'working'
+                                            ? 'status-working'
+                                            : 'status-maint' %>">
+                  <%= s.status === 'working' ? 'Working' : 'Maintenance' %>
+                </span>
+
+                <% if (s.isFree) { %>
+                  <span class="badge badge-soft">Free</span>
+                <% } %>
+              </div>
             </div>
 
-            <p class="script-desc"><%= s.description %></p>
+            <div class="script-card-footer">
+              <!-- Copy Loader pakai URL dari loader.json (app.locals.loaderUrl) -->
+              <button
+                type="button"
+                class="btn btn-small btn-primary"
+                data-loader-url="<%= loaderUrl %>"
+                onclick="copyLoader(this)"
+              >
+                Copy Loader
+              </button>
 
-            <div class="script-meta-row">
-              <span class="status-pill <%= s.status === 'working'
-                                          ? 'status-working'
-                                          : 'status-maint' %>">
-                <%= s.status === 'working' ? 'Working' : 'Maintenance' %>
-              </span>
-
-              <% if (s.isFree) { %>
-                <span class="badge badge-soft">Free</span>
+              <% if (s.gameUrl) { %>
+                <a
+                  href="<%= s.gameUrl %>"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="btn btn-small btn-outline"
+                >
+                  Game Link
+                </a>
+              <% } else { %>
+                <span class="helper-text" style="font-size:12px;">
+                  No game link
+                </span>
               <% } %>
             </div>
-          </div>
-
-          <div class="script-card-footer">
-            <!-- Copy Loader pakai URL dari loader.json (app.locals.loaderUrl) -->
-            <button
-              type="button"
-              class="btn btn-small btn-primary"
-              data-loader-url="<%= loaderUrl %>"
-              onclick="copyLoader(this)"
-            >
-              Copy Loader
-            </button>
-
-            <a
-              href="<%= s.gameUrl %>"
-              target="_blank"
-              class="btn btn-small btn-outline"
-            >
-              Game Link
-            </a>
-          </div>
-        </article>
-      <% }) %>
-    </section>
+          </article>
+        <% }) %>
+      </section>
+    <% } %>
   </main>
 
   <footer class="footer">
-    <span><%= scripts.length %> supported games.</span>
+    <span><%= (scripts && scripts.length) || 0 %> supported games.</span>
   </footer>
 
   <!-- Script kecil untuk copy ke clipboard -->
@@ -92,7 +112,7 @@
 
         if (navigator.clipboard && navigator.clipboard.writeText) {
           await navigator.clipboard.writeText(text);
-          alert("Loader copied:\n" + text);
+          alert("Loader copied:\\n" + text);
         } else {
           // fallback lama
           window.prompt("Copy this loader:", text);

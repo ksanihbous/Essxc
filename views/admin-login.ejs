@@ -2,84 +2,51 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Admin Login - <%= siteName %></title>
+  <title>Discord Login - <%= siteName || 'ExHub' %></title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="/public/css/main.css" />
   <link rel="icon" type="image/png" href="/public/img/logo-exhub.png" />
   <script src="/public/js/protect.js" defer></script>
 </head>
 <body class="page-dark">
-
-  <%- include('partials/nav', { active: 'admin' }) %>
-
   <main class="center-wrap">
-    <div class="card" style="max-width: 420px; width: 100%;">
-      <div style="text-align:center; margin-bottom:12px;">
+    <div class="card" style="max-width:420px;width:100%;">
+      <div class="card-header" style="text-align:center;margin-bottom:12px;">
         <img
-          src="/public/img/logo-exhub.png"
-          alt="logo"
-          style="width:56px;height:56px;border-radius:50%;object-fit:cover;margin-bottom:8px;"
+          src="/public/img/logo-discord.png"
+          class="discord-logo-sm"
+          alt="Discord"
+          style="width:64px;height:64px;object-fit:contain;margin-bottom:8px;"
         />
-        <h1 style="margin:0 0 6px;">Admin Panel Login</h1>
-        <p class="helper-text">
-          Halaman ini hanya untuk staff yang memiliki kredensial admin.
-          Login menggunakan username &amp; password yang tersimpan di
-          <code>ADMIN_USER</code> dan <code>ADMIN_PASS</code> (Environment Variables).
+        <h1 style="margin:0 0 6px;">Login with Discord</h1>
+        <p class="helper-text" style="margin:0;">
+          We use Discord to bind your keys and protect against abuse.
         </p>
       </div>
 
-      <% if (error) { %>
-        <div class="alert alert-error">
-          <div class="alert-title">Login gagal</div>
-          <div><%= error %></div>
-        </div>
-      <% } %>
+      <div class="card-body">
+        <%
+          const targetNext = nextUrl || '/dashboard';
+          const nextParam = 'next=' + encodeURIComponent(targetNext);
+        %>
 
-      <form method="post" action="/admin/login" style="margin-top:12px;">
-        <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px;">
-          <div>
-            <label style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:4px;">
-              Username
-            </label>
-            <input
-              type="text"
-              name="username"
-              required
-              autocomplete="username"
-              class="input"
-              placeholder="Admin username"
-            />
-          </div>
+        <a
+          href="/auth/discord?<%= nextParam %>"
+          class="btn btn-discord btn-full"
+        >
+          Login with Discord
+        </a>
 
-          <div>
-            <label style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:4px;">
-              Password
-            </label>
-            <input
-              type="password"
-              name="password"
-              required
-              autocomplete="current-password"
-              class="input"
-              placeholder="Admin password"
-            />
-          </div>
-        </div>
-
-        <button type="submit" class="btn btn-primary btn-full">
-          Login as Admin
-        </button>
-      </form>
-
-      <p class="helper-text" style="margin-top:10px;font-size:12px;text-align:center;">
-        Kredensial tidak disimpan di database / Redis.
-        Semua validasi terjadi di server menggunakan environment variables.
-      </p>
+        <p class="helper-text" style="margin-top:10px;font-size:12px;text-align:center;">
+          After login you will be redirected back to:
+          <code><%= targetNext %></code>
+        </p>
+      </div>
     </div>
   </main>
 
   <footer class="footer">
-    <span>© <%= new Date().getFullYear() %> <%= siteName %> • Admin Area</span>
+    <span>© <%= new Date().getFullYear() %> <%= siteName || 'ExHub' %></span>
   </footer>
 </body>
 </html>

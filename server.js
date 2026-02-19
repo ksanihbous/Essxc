@@ -92,10 +92,15 @@ app.locals.siteName = loaderConfig.siteName;
 app.locals.tagline = loaderConfig.tagline;
 app.locals.loaderUrl = loaderConfig.loader;
 
+/* inject locals ke semua view (buat navbar, dsb) */
 app.use((req, res, next) => {
   res.locals.currentUser = req.session.user || null;
   res.locals.adminUser = req.session.adminUser || null;
   res.locals.siteName = loaderConfig.siteName;
+  res.locals.tagline = loaderConfig.tagline;
+  res.locals.loaderUrl = loaderConfig.loader;
+  // flag untuk navbar: true kalau dia admin (ADMIN_DISCORD_IDS atau adminUser)
+  res.locals.isAdminNav = isAdmin(req);
   next();
 });
 
@@ -111,8 +116,10 @@ function requireAuth(req, res, next) {
 }
 
 function isAdmin(req) {
+  // kalau sudah login via admin panel (ADMIN_USER/ADMIN_PASS)
   if (req.session && req.session.adminUser) return true;
 
+  // atau Discord ID-nya ada di ADMIN_DISCORD_IDS
   const adminIds = (process.env.ADMIN_DISCORD_IDS || "")
     .split(",")
     .map((s) => s.trim())
@@ -673,13 +680,24 @@ app.get("/admin/login", (req, res) => {
     return res.redirect("/admin");
   }
 
+  const redirectTo =
+    typeof req.query.redirectTo === "string" && req.query.redirectTo.trim()
+      ? req.query.redirectTo
+      : "/admin";
+
   res.render("admin-login", {
-    error: null,
+    errorMessage: null,
+    redirectTo,
   });
 });
 
 app.post("/admin/login", (req, res) => {
-  const { username, password } = req.body || {};
+  const { username, password, redirectTo } = req.body || {};
+
+  const target =
+    typeof redirectTo === "string" && redirectTo.trim()
+      ? redirectTo
+      : "/admin";
 
   if (!ADMIN_USER || !ADMIN_PASS) {
     return res.status(500).send("Admin login is not configured.");
@@ -690,11 +708,12 @@ app.post("/admin/login", (req, res) => {
       username: ADMIN_USER,
       loggedInAt: new Date().toISOString(),
     };
-    return res.redirect("/admin");
+    return res.redirect(target);
   }
 
   return res.status(401).render("admin-login", {
-    error: "Username atau password salah",
+    errorMessage: "Username atau password salah",
+    redirectTo: target,
   });
 });
 

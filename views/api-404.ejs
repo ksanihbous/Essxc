@@ -3,35 +3,36 @@
 <head>
   <meta charset="UTF-8" />
   <title>404 - <%= siteName || 'ExHub' %></title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="/public/css/main.css" />
   <link rel="icon" type="image/png" href="/public/img/logo-exhub.png" />
   <script src="/public/js/protect.js" defer></script>
 </head>
 <body class="page-dark">
-  <div class="center-wrap">
-    <div class="card card-404">
-      <h1>404</h1>
-      <p>This endpoint is only for the Roblox loader.</p>
-      <p class="helper-text">
+  <main class="center-wrap">
+    <div class="card card-404" style="max-width:460px;width:100%;text-align:center;">
+      <h1 style="margin-top:0;margin-bottom:6px;">404</h1>
+      <p style="margin:0 0 6px;">This endpoint is only for the Roblox loader.</p>
+      <p class="helper-text" style="margin:0 0 14px;">
         Use the in-game script loader instead of opening this link directly in your browser.
       </p>
 
       <!-- Panel loader di tengah, mirip home -->
-      <div class="loader-panel">
+      <div class="loader-panel" style="margin-top:10px;text-align:left;">
         <span class="badge badge-soft" style="background:#16a34a22;color:#22c55e;">
           Loader Script
         </span>
 
         <pre class="code-block mono" style="margin-top:12px; white-space:pre-wrap;">
--- load <%= siteName || 'ExHub' %> Scripts universal loader
+-- load <%= siteName || 'ExHub' %> universal loader
 loadstring(game:HttpGet("<%= loaderUrl %>"))()
         </pre>
       </div>
 
-      <a href="/" class="btn btn-primary" style="margin-top:16px;">
+      <a href="/" class="btn btn-primary btn-full" style="margin-top:16px;">
         Back to Home
       </a>
     </div>
-  </div>
+  </main>
 </body>
 </html>

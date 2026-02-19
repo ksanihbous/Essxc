@@ -3,22 +3,52 @@
 <head>
   <meta charset="UTF-8" />
   <title>Login Required - <%= siteName %></title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="/public/css/main.css" />
   <link rel="icon" type="image/png" href="/public/img/logo-exhub.png" />
   <script src="/public/js/protect.js" defer></script>
 </head>
 <body class="page-dark">
-<div class="center-wrap">
-  <div class="card">
-    <h1>Login Required</h1>
-    <p>You must login with Discord before using the key system.</p>
-    <a
-      href="/auth/discord?<%= new URLSearchParams({ next: redirectTo || '/get-key?provider=workink' }).toString() %>"
-      class="btn btn-discord btn-full"
-    >
-      Login with Discord
-    </a>
-  </div>
-</div>
+
+  <!-- Navbar (pakai partial, supaya konsisten) -->
+  <%- include('partials/nav', { active: 'get-key' }) %>
+
+  <main class="center-wrap">
+    <div class="card" style="max-width: 420px; width: 100%;">
+      <div class="card-header" style="text-align:center; margin-bottom:12px;">
+        <img
+          src="/public/img/logo-exhub.png"
+          alt="logo"
+          style="width:56px;height:56px;border-radius:50%;object-fit:cover;margin-bottom:8px;"
+        />
+        <h1 style="margin:0 0 6px;">Login Required</h1>
+        <p class="helper-text">
+          You must login with your Discord account before using the key system.
+        </p>
+      </div>
+
+      <% 
+        const nextTarget = (typeof redirectTo !== 'undefined' && redirectTo)
+          ? redirectTo
+          : '/get-key?provider=workink';
+      %>
+
+      <a
+        href="/auth/discord?next=<%= encodeURIComponent(nextTarget) %>"
+        class="btn btn-discord btn-full"
+      >
+        Login with Discord
+      </a>
+
+      <p class="helper-text" style="margin-top:10px;font-size:12px;text-align:center;">
+        After login, you will be redirected to:
+        <code><%= nextTarget %></code>
+      </p>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <span>© <%= new Date().getFullYear() %> <%= siteName %>. Not affiliated with Discord.</span>
+  </footer>
 </body>
 </html>

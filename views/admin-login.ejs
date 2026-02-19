@@ -13,42 +13,38 @@
   <%- include('partials/nav', { active: 'admin' }) %>
 
   <main class="center-wrap">
-    <div class="card" style="max-width:420px;width:100%;">
-      <!-- Header -->
-      <div class="card-header" style="text-align:center;margin-bottom:12px;">
+    <div class="card" style="max-width: 420px; width: 100%;">
+      <div style="text-align:center; margin-bottom:12px;">
         <img
           src="/public/img/logo-exhub.png"
           alt="logo"
           style="width:56px;height:56px;border-radius:50%;object-fit:cover;margin-bottom:8px;"
         />
         <h1 style="margin:0 0 6px;">Admin Panel Login</h1>
-        <p class="helper-text" style="margin:0;">
+        <p class="helper-text">
           Halaman ini hanya untuk staff yang memiliki kredensial admin.
           Login menggunakan username &amp; password yang tersimpan di
           <code>ADMIN_USER</code> dan <code>ADMIN_PASS</code> (Environment Variables).
         </p>
       </div>
 
-      <!-- Error message -->
       <% if (error) { %>
-        <div class="alert alert-error" style="margin-bottom:10px;">
+        <div class="alert alert-error">
           <div class="alert-title">Login gagal</div>
           <div><%= error %></div>
         </div>
       <% } %>
 
-      <!-- Form -->
       <form method="post" action="/admin/login" style="margin-top:12px;">
+        <!-- redirectTo biar kalau nanti mau redirect ke halaman lain, tetap kebawa -->
+        <input type="hidden" name="redirectTo" value="<%= redirectTo || '/admin' %>" />
+
         <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px;">
           <div>
-            <label
-              for="admin-username"
-              style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:4px;"
-            >
+            <label style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:4px;">
               Username
             </label>
             <input
-              id="admin-username"
               type="text"
               name="username"
               required
@@ -59,14 +55,10 @@
           </div>
 
           <div>
-            <label
-              for="admin-password"
-              style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:4px;"
-            >
+            <label style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:4px;">
               Password
             </label>
             <input
-              id="admin-password"
               type="password"
               name="password"
               required

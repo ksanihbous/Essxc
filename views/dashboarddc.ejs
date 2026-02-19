@@ -88,7 +88,23 @@
                      : '-';
               %>
                 <tr>
-                  <td><code class="mono"><%= k.token %></code></td>
+                  <td>
+                    <div
+                      class="key-copy-wrap"
+                      style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;"
+                    >
+                      <code class="mono"><%= k.token %></code>
+                      <button
+                        type="button"
+                        class="btn btn-small btn-outline"
+                        data-copy-key="1"
+                        data-token="<%= k.token %>"
+                        aria-label="Copy key"
+                      >
+                        📋
+                      </button>
+                    </div>
+                  </td>
                   <td><%= k.provider || '-' %></td>
                   <td><%= createdAt %></td>
                   <td><%= expiresAt %></td>
@@ -114,5 +130,57 @@
       <strong><%= (user && user.username) || 'Unknown' %></strong>
     </span>
   </footer>
+
+  <!-- Copy key script (mobile & desktop) -->
+  <script>
+    (function () {
+      async function copyKey(btn) {
+        const token = btn.getAttribute("data-token");
+        if (!token) return;
+
+        const text = token;
+        const originalText = btn.getAttribute("data-original-text") || btn.textContent;
+
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text);
+          } else {
+            // Fallback lama untuk browser lama / beberapa mobile
+            const textarea = document.createElement("textarea");
+            textarea.value = text;
+            textarea.setAttribute("readonly", "");
+            textarea.style.position = "fixed";
+            textarea.style.opacity = "0";
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+            document.execCommand("copy");
+            document.body.removeChild(textarea);
+          }
+
+          // Feedback kecil di tombol (ubah icon sementara)
+          btn.setAttribute("data-original-text", originalText);
+          btn.textContent = "✓";
+          btn.classList.add("copied");
+
+          setTimeout(function () {
+            btn.textContent = originalText;
+            btn.classList.remove("copied");
+          }, 1500);
+        } catch (err) {
+          console.error("Failed to copy key:", err);
+          alert("Failed to copy key:\n" + text);
+        }
+      }
+
+      // Event delegation supaya aman di mobile & desktop
+      document.addEventListener("click", function (e) {
+        const btn = e.target.closest("[data-copy-key]");
+        if (!btn) return;
+        e.preventDefault();
+        copyKey(btn);
+      });
+    })();
+  </script>
 </body>
 </html>

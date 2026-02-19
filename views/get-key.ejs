@@ -77,8 +77,17 @@
 
         <% if (newKeyToken) { %>
           <div class="alert alert-success" style="margin-top: 1rem;">
-            <strong>New Key Generated:</strong><br />
-            <code><%= newKeyToken %></code>
+            <strong>New Key Generated:</strong>
+            <div class="key-copy-wrap" style="margin-top: 0.5rem;">
+              <code class="mono"><%= newKeyToken %></code>
+              <button
+                type="button"
+                class="btn btn-small btn-outline"
+                data-copy-key="<%= newKeyToken %>"
+              >
+                Copy
+              </button>
+            </div>
             <p style="margin-top: 0.5rem;">
               Copy this key into your Roblox loader UI. You can always see it again in Dashboard
               or in the list on the right.
@@ -124,7 +133,18 @@
                     const status = isExpired ? 'Expired' : 'Active';
                 %>
                   <tr>
-                    <td><code class="mono"><%= k.token %></code></td>
+                    <td>
+                      <div class="key-copy-wrap">
+                        <code class="mono"><%= k.token %></code>
+                        <button
+                          type="button"
+                          class="btn btn-small btn-outline"
+                          data-copy-key="<%= k.token %>"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    </td>
                     <td><%= k.provider || '-' %></td>
                     <td>
                       <% if (isExpired) { %>
@@ -155,5 +175,55 @@
   <footer class="footer">
     <span>Need help? Join our Discord.</span>
   </footer>
+
+  <!-- Copy key handler (mobile & desktop) -->
+  <script>
+    function setButtonCopiedState(btn) {
+      const originalText = btn.dataset.originalText || btn.textContent;
+      if (!btn.dataset.originalText) {
+        btn.dataset.originalText = originalText;
+      }
+      btn.classList.add('copied');
+      btn.textContent = 'Copied';
+
+      setTimeout(function () {
+        btn.classList.remove('copied');
+        btn.textContent = btn.dataset.originalText || 'Copy';
+      }, 1600);
+    }
+
+    async function copyKeyFromButton(btn) {
+      const key = btn.getAttribute('data-copy-key');
+      if (!key) return;
+
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(key);
+        } else {
+          // Fallback lama untuk browser yang belum support Clipboard API
+          const ta = document.createElement('textarea');
+          ta.value = key;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        }
+        setButtonCopiedState(btn);
+      } catch (err) {
+        console.error('Failed to copy key:', err);
+        alert('Copy failed, please copy manually:\\n' + key);
+      }
+    }
+
+    // Delegasi event: semua tombol dengan data-copy-key akan otomatis bekerja
+    document.addEventListener('click', function (ev) {
+      const btn = ev.target.closest('[data-copy-key]');
+      if (!btn) return;
+      copyKeyFromButton(btn);
+    });
+  </script>
 </body>
 </html>

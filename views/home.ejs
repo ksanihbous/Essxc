@@ -2,105 +2,121 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title><%= siteName %> - Home</title>
+  <title><%= siteName || 'ExHub' %> - Home</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="/public/css/main.css" />
   <link rel="icon" type="image/png" href="/public/img/logo-exhub.png" />
   <script src="/public/js/protect.js" defer></script>
 </head>
 <body class="page-dark">
-<header class="nav">
-  <div class="nav-left">
-    <img src="/public/img/logo-exhub.png" class="nav-logo" alt="ExHub" />
-    <div class="nav-title">
-      <span class="site-name"><%= siteName %></span>
-      <span class="site-tagline"><%= tagline %></span>
-    </div>
-  </div>
-  <nav class="nav-links">
-    <a href="/" class="nav-link nav-link-active">Home</a>
-    <a href="/get-key?provider=linkvertise" class="nav-link">Get Key</a>
-    <a href="/scripts" class="nav-link">Scripts</a>
-    <% if (currentUser) { %>
-      <a href="/dashboard" class="nav-link">Dashboard</a>
-      <a href="/logout" class="nav-link nav-link-ghost">Logout</a>
-    <% } else { %>
-      <a href="/login" class="nav-link nav-link-ghost">Login</a>
-    <% } %>
-  </nav>
-</header>
 
-<main class="hero">
-  <section class="hero-main">
-    <h1>Let's Hype With<br/>With <span class="accent"><%= siteName %>.</span></h1>
-    <p class="hero-sub">
-      Exclusive Roblox scripts with features tuned for better performance, key-protected
-      via Discord and ads provider.
-    </p>
+  <!-- NAVBAR (reuse partial supaya konsisten di semua halaman) -->
+  <%- include('partials/nav', { active: 'home' }) %>
 
-    <div class="hero-actions">
-      <a href="/get-key?provider=workink" class="btn btn-primary">Get Free Key</a>
-      <a href="/scripts" class="btn btn-outline">Browse Scripts</a>
-    </div>
+  <main>
+    <!-- HERO / LANDING GRID -->
+    <section class="hero">
+      <!-- LEFT: main copy -->
+      <section class="hero-main">
+        <h1>
+          Let's Hype With<br />
+          <span class="accent"><%= siteName %></span>.
+        </h1>
 
-    <div class="hero-stats">
-      <div class="stat-pill">
-        <span class="dot dot-green"></span> Undetected &amp; Secure
-      </div>
-      <div class="stat-pill">
-        <span class="dot dot-green"></span> Multi-Platform Support
-      </div>
-      <div class="stat-pill">
-        <span class="dot dot-green"></span> Instant Updates
-      </div>
-    </div>
+        <p class="hero-sub">
+          Exclusive Roblox scripts with features tuned for better performance,
+          key-protected via Discord and ads provider.
+        </p>
 
-    <div class="hero-loader-card">
-      <div class="loader-tabs">
-        <button class="tab active">loader.lua</button>
-      </div>
-      <pre class="code-block">
+        <div class="hero-actions">
+          <a href="/get-key?provider=workink" class="btn btn-primary">Get Free Key</a>
+          <a href="/scripts" class="btn btn-outline">Browse Scripts</a>
+        </div>
+
+        <div class="hero-stats">
+          <div class="stat-pill">
+            <span class="dot dot-green"></span> Undetected &amp; Secure
+          </div>
+          <div class="stat-pill">
+            <span class="dot dot-green"></span> Multi-Platform Support
+          </div>
+          <div class="stat-pill">
+            <span class="dot dot-green"></span> Instant Updates
+          </div>
+        </div>
+
+        <div class="hero-loader-card">
+          <div class="loader-tabs">
+            <button class="tab active">loader.lua</button>
+          </div>
+          <pre class="code-block">
 -- load <%= siteName %> universal loader
 loadstring(game:HttpGet("<%= loaderUrl %>"))()
-      </pre>
-    </div>
-  </section>
+          </pre>
+        </div>
+      </section>
 
-  <section class="hero-side">
-    <div class="discord-card">
-      <img src="/public/img/logo-discord.png" alt="Discord" class="discord-logo" />
-      <h2>Join Community</h2>
-      <p>Connect with other users, get announcements and support.</p>
-      <a href="<%= loaderConfig.discordInvite %>" target="_blank" class="btn btn-discord">
-        Join Discord
-      </a>
-    </div>
+      <!-- RIGHT: discord + scripts preview -->
+      <section class="hero-side">
+        <div class="discord-card">
+          <img
+            src="/public/img/logo-discord.png"
+            alt="Discord"
+            class="discord-logo"
+          />
+          <h2>Join Community</h2>
+          <p class="helper-text">
+            Connect with other users, get announcements and support.
+          </p>
+          <a
+            href="<%= loaderConfig.discordInvite %>"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="btn btn-discord btn-full"
+          >
+            Join Discord
+          </a>
+        </div>
 
-    <div class="scripts-card">
-      <h3>Supported Games</h3>
-      <p class="scripts-sub">A few of the scripts available in <%= siteName %>.</p>
-      <div class="scripts-list">
-        <% scriptsPreview.forEach(function(s) { %>
-          <div class="script-item">
-            <img src="<%= s.thumbnail %>" class="script-thumb" alt="<%= s.name %>" />
-            <div class="script-meta">
-              <div class="script-title-row">
-                <span class="script-name"><%= s.name %></span>
-                <span class="script-version"><%= s.version %></span>
+        <div class="scripts-card">
+          <h3>Supported Games</h3>
+          <p class="scripts-sub">
+            A few of the scripts available in <%= siteName %>.
+          </p>
+
+          <div class="scripts-list">
+            <% (scriptsPreview || []).forEach(function(s) { %>
+              <div class="script-item">
+                <img
+                  src="<%= s.thumbnail || '/public/img/logo-exhub.png' %>"
+                  class="script-thumb"
+                  alt="<%= s.name %>"
+                />
+                <div class="script-meta">
+                  <div class="script-title-row">
+                    <span class="script-name"><%= s.name %></span>
+                    <span class="script-version"><%= s.version %></span>
+                  </div>
+
+                  <span class="status-pill <%= s.status === 'working' ? 'status-working' : 'status-maint' %>">
+                    <%= s.status === 'working' ? 'Working' : 'Maintenance' %>
+                  </span>
+                </div>
               </div>
-              <span class="script-status <%= s.status === 'working' ? 'status-working' : 'status-maint' %>">
-                <%= s.status === 'working' ? 'Working' : 'Maintenance' %>
-              </span>
-            </div>
+            <% }) %>
           </div>
-        <% }) %>
-      </div>
-      <a href="/scripts" class="link-muted">View all scripts →</a>
-    </div>
-  </section>
-</main>
 
-<footer class="footer">
-  <span>© <%= new Date().getFullYear() %> <%= siteName %>. Not affiliated with Roblox.</span>
-</footer>
+          <a href="/scripts" class="link-muted">View all scripts →</a>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>
+      © <%= new Date().getFullYear() %> <%= siteName || 'ExHub' %>.
+      Not affiliated with Roblox.
+    </span>
+  </footer>
 </body>
 </html>

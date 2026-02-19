@@ -3,11 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <title>Dashboard - <%= siteName || 'ExHub' %></title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="/public/css/main.css" />
   <link rel="icon" type="image/png" href="/public/img/logo-exhub.png" />
   <script src="/public/js/protect.js" defer></script>
 </head>
 <body class="page-dark">
+
+  <!-- NAVBAR -->
   <%- include('partials/nav', { active: 'dashboard' }) %>
 
   <main class="container">
@@ -24,7 +27,9 @@
         <div>
           <h1>Welcome back, <%= (user && (user.global_name || user.username)) || 'User' %></h1>
           <% if (user && user.id) { %>
-            <p>ID: <code><%= user.id %></code></p>
+            <p class="helper-text">
+              Discord ID: <code><%= user.id %></code>
+            </p>
           <% } %>
         </div>
       </div>
@@ -56,49 +61,49 @@
 
       <% if (!keys || !keys.length) { %>
         <p class="helper-text">
-          You don't have any keys yet. Generate one from the Get Key tab.
+          You don't have any keys yet. Generate one from the Get Key page.
         </p>
       <% } else { %>
-        <table class="keys-table">
-          <thead>
-            <tr>
-              <th>Key</th>
-              <th>Provider</th>
-              <th>Created</th>
-              <th>Expires</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% const now = Date.now(); %>
-            <% keys.forEach(function(k) { 
-                 const expired = k.deleted || (k.expiresAfter && k.expiresAfter <= now);
-                 const status = expired ? 'Expired' : 'Active';
-            %>
+        <div class="table-wrapper">
+          <table class="keys-table">
+            <thead>
               <tr>
-                <td><code class="mono"><%= k.token %></code></td>
-                <td><%= k.provider || '-' %></td>
-                <td>
-                  <%= k.createdAt
-                        ? new Date(k.createdAt).toLocaleString()
-                        : '-' %>
-                </td>
-                <td>
-                  <%= k.expiresAfter
-                        ? new Date(k.expiresAfter).toLocaleString()
-                        : '-' %>
-                </td>
-                <td>
-                  <span class="status-pill <%= status === 'Active'
-                                                ? 'status-working'
-                                                : 'status-maint' %>">
-                    <%= status %>
-                  </span>
-                </td>
+                <th>Key</th>
+                <th>Provider</th>
+                <th>Created</th>
+                <th>Expires</th>
+                <th>Status</th>
               </tr>
-            <% }) %>
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              <% var now = Date.now(); %>
+              <% keys.forEach(function(k) {
+                   var expired = k.deleted || (k.expiresAfter && k.expiresAfter <= now);
+                   var status = expired ? 'Expired' : 'Active';
+                   var createdAt = k.createdAt
+                     ? new Date(k.createdAt).toLocaleString()
+                     : '-';
+                   var expiresAt = k.expiresAfter
+                     ? new Date(k.expiresAfter).toLocaleString()
+                     : '-';
+              %>
+                <tr>
+                  <td><code class="mono"><%= k.token %></code></td>
+                  <td><%= k.provider || '-' %></td>
+                  <td><%= createdAt %></td>
+                  <td><%= expiresAt %></td>
+                  <td>
+                    <span class="status-pill <%= status === 'Active'
+                                                    ? 'status-working'
+                                                    : 'status-maint' %>">
+                      <%= status %>
+                    </span>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
       <% } %>
     </section>
   </main>

@@ -95,6 +95,7 @@ app.locals.loaderUrl = loaderConfig.loader;
 app.use((req, res, next) => {
   res.locals.currentUser = req.session.user || null;
   res.locals.adminUser = req.session.adminUser || null;
+  res.locals.siteName = loaderConfig.siteName;
   next();
 });
 
@@ -445,6 +446,54 @@ async function deleteKeyEverywhere(token) {
     userId: userId || null,
     removedFromList,
     deletedDoc,
+  };
+}
+
+// Cleanup user: hapus user:*:keys yang TIDAK punya key aktif sama sekali
+async function cleanupUsersWithoutActiveKeys() {
+  const now = nowMs();
+  const listKeys = await redis.keys("user:*:keys");
+
+  let totalUserLists = 0;
+  let deletedUserLists = 0;
+  let usersWithActiveKeys = 0;
+
+  for (const listKey of listKeys) {
+    totalUserLists += 1;
+
+    const tokens = await redis.lrange(listKey, 0, -1);
+    if (!tokens || !tokens.length) {
+      // list kosong -> hapus langsung
+      await redis.del(listKey);
+      deletedUserLists += 1;
+      continue;
+    }
+
+    let hasActive = false;
+
+    for (const token of tokens) {
+      const info = await redis.get(`key:${token}`);
+      if (!info) continue;
+      const expired = info.expiresAfter && info.expiresAfter <= now;
+      const deleted = !!info.deleted;
+      if (!expired && !deleted) {
+        hasActive = true;
+        break;
+      }
+    }
+
+    if (!hasActive) {
+      await redis.del(listKey);
+      deletedUserLists += 1;
+    } else {
+      usersWithActiveKeys += 1;
+    }
+  }
+
+  return {
+    totalUserLists,
+    deletedUserLists,
+    usersWithActiveKeys,
   };
 }
 
@@ -803,7 +852,7 @@ app.post("/admin/cleanup-keys", requireAdmin, async (req, res) => {
     const result = await cleanupAllUserKeys();
     req.session.cleanupSummary = {
       type: "success",
-      message: `Cleanup selesai: scanned=${result.scannedTokens}, removedFromLists=${result.removedFromLists}, deletedKeyDocs=${result.deletedKeyDocs}, affectedUsers=${result.affectedUsers}`,
+      message: `Cleanup keys selesai: scanned=${result.scannedTokens}, removedFromLists=${result.removedFromLists}, deletedKeyDocs=${result.deletedKeyDocs}, affectedUsers=${result.affectedUsers}`,
       result,
     };
   } catch (err) {
@@ -811,6 +860,26 @@ app.post("/admin/cleanup-keys", requireAdmin, async (req, res) => {
     req.session.cleanupSummary = {
       type: "error",
       message: "Cleanup keys gagal: " + err.message,
+    };
+  }
+  res.redirect("/admin");
+});
+
+/* ========= ADMIN: CLEANUP USERS (GLOBAL) ========= */
+
+app.post("/admin/cleanup-users", requireAdmin, async (req, res) => {
+  try {
+    const result = await cleanupUsersWithoutActiveKeys();
+    req.session.cleanupSummary = {
+      type: "success",
+      message: `Cleanup users selesai: totalUserLists=${result.totalUserLists}, deletedUserLists=${result.deletedUserLists}, usersWithActiveKeys=${result.usersWithActiveKeys}`,
+      result,
+    };
+  } catch (err) {
+    console.error("Failed to cleanup users:", err);
+    req.session.cleanupSummary = {
+      type: "error",
+      message: "Cleanup users gagal: " + err.message,
     };
   }
   res.redirect("/admin");

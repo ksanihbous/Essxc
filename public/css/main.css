@@ -198,6 +198,23 @@ body.page-dark {
   font-size: 13px;
 }
 
+/* tombol copy key / ikon kecil di samping key */
+.btn[data-copy-key] {
+  min-width: 32px;
+  padding-inline: 8px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* state "copied" – dipakai JS dengan class .copied */
+.btn.copied {
+  background: var(--success);
+  border-color: var(--success);
+  color: #020308;
+  box-shadow: 0 0 0 1px rgba(65, 208, 124, 0.5);
+  transform: translateY(-1px);
+}
+
 /* tambahan: tombol danger untuk admin / aksi destructive */
 .btn-danger {
   background: var(--danger);
@@ -497,6 +514,18 @@ body.page-dark {
 .table-wrapper {
   width: 100%;
   overflow-x: auto;
+}
+
+/* wrapper key + tombol copy di dashboard */
+.key-copy-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.key-copy-wrap code {
+  word-break: break-all;
 }
 
 /* SCRIPTS GRID */
@@ -828,5 +857,9 @@ body.page-dark {
   .keys-table th,
   .keys-table td {
     white-space: nowrap;
+  }
+
+  .key-copy-wrap {
+    gap: 0.35rem;
   }
 }

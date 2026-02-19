@@ -9,12 +9,11 @@
 </head>
 <body class="page-dark">
 
-  <% /* optional navbar, kalau kamu pakai partial nav */ %>
   <%- include('partials/nav', { active: 'admin' }) %>
 
   <main class="center-wrap">
     <div class="card" style="max-width: 420px; width: 100%;">
-      <div class="card-header" style="text-align:center; margin-bottom:12px;">
+      <div style="text-align:center; margin-bottom:12px;">
         <img
           src="/public/img/logo-exhub.png"
           alt="logo"
@@ -22,61 +21,48 @@
         />
         <h1 style="margin:0 0 6px;">Admin Panel Login</h1>
         <p class="helper-text">
-          This page is restricted. Only staff with admin credentials can access the panel.
+          Halaman ini hanya untuk staff yang memiliki kredensial admin.
+          Login menggunakan username &amp; password yang tersimpan di
+          <code>ADMIN_USER</code> dan <code>ADMIN_PASS</code> (Environment Variables).
         </p>
       </div>
 
-      <% if (typeof errorMessage !== 'undefined' && errorMessage) { %>
-        <div class="alert alert-success" style="background:rgba(255,75,106,0.12);border-color:rgba(255,75,106,0.6);color:#ff9aaa;">
-          <strong>Login Failed.</strong> <%= errorMessage %>
+      <% if (error) { %>
+        <div class="alert alert-error">
+          <div class="alert-title">Login gagal</div>
+          <div><%= error %></div>
         </div>
       <% } %>
 
       <form method="post" action="/admin/login" style="margin-top:12px;">
-        <input type="hidden" name="redirectTo" value="<%= redirectTo || '/admin' %>" />
-
-        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
-          <label style="font-size:13px;color:var(--text-muted);">
-            Username
+        <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px;">
+          <div>
+            <label style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:4px;">
+              Username
+            </label>
             <input
               type="text"
               name="username"
               required
               autocomplete="username"
-              style="
-                margin-top:4px;
-                width:100%;
-                padding:8px 10px;
-                border-radius:10px;
-                border:1px solid var(--border-soft);
-                background:#05070f;
-                color:var(--text-main);
-                font-size:13px;
-              "
-              placeholder="Admin username"
+              class="input"
+              placeholder="Admin username (ENV ADMIN_USER)"
             />
-          </label>
+          </div>
 
-          <label style="font-size:13px;color:var(--text-muted);">
-            Password
+          <div>
+            <label style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:4px;">
+              Password
+            </label>
             <input
               type="password"
               name="password"
               required
               autocomplete="current-password"
-              style="
-                margin-top:4px;
-                width:100%;
-                padding:8px 10px;
-                border-radius:10px;
-                border:1px solid var(--border-soft);
-                background:#05070f;
-                color:var(--text-main);
-                font-size:13px;
-              "
-              placeholder="Admin password"
+              class="input"
+              placeholder="Admin password (ENV ADMIN_PASS)"
             />
-          </label>
+          </div>
         </div>
 
         <button type="submit" class="btn btn-primary btn-full">
@@ -85,7 +71,8 @@
       </form>
 
       <p class="helper-text" style="margin-top:10px;font-size:12px;text-align:center;">
-        Credentials are stored securely in server environment variables.
+        Kredensial tidak disimpan di database / Redis.
+        Semua validasi terjadi di server menggunakan environment variables.
       </p>
     </div>
   </main>

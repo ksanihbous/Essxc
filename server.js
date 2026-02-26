@@ -58,7 +58,8 @@ const LINKVERTISE_BASE_URL =
 /* ========= KEY CONFIG ========= */
 
 const KEY_PREFIX = "EXHUBFREE";
-const KEY_TTL_MS = 3 * 60 * 60 * 1000; // 3 jam
+// DEFAULT (kalau belum diubah dari admin): 3 jam
+const DEFAULT_KEY_TTL_MS = 3 * 60 * 60 * 1000; // 3 jam
 const VERIFY_SESSION_TTL_SEC = 10 * 60; // 10 menit sekali pakai
 
 /* ========= ADMIN USER/PASS (ENV) ========= */
@@ -126,9 +127,11 @@ function isAdmin(req) {
     .map((s) => s.trim())
     .filter(Boolean);
 
-  return !!(req.session &&
+  return !!(
+    req.session &&
     req.session.user &&
-    adminIds.includes(String(req.session.user.id)));
+    adminIds.includes(String(req.session.user.id))
+  );
 }
 
 function requireAdmin(req, res, next) {
@@ -158,12 +161,54 @@ function nowMs() {
   return Date.now();
 }
 
+/* ========= KEY TTL DYNAMIC CONFIG (via Redis) ========= */
+
+const KEY_TTL_CONFIG_KEY = "config:key_ttl_ms";
+
+// Ambil TTL key (ms) dari Redis, fallback ke DEFAULT_KEY_TTL_MS
+async function getKeyTtlMs() {
+  try {
+    const stored = await redis.get(KEY_TTL_CONFIG_KEY);
+    const num = Number(stored);
+    if (!stored || isNaN(num) || num <= 0) {
+      return DEFAULT_KEY_TTL_MS;
+    }
+    return num;
+  } catch (err) {
+    console.error(
+      "[KEY-TTL] gagal load dari Redis, pakai default:",
+      err.message || err
+    );
+    return DEFAULT_KEY_TTL_MS;
+  }
+}
+
+// Set TTL key (ms) ke Redis
+async function setKeyTtlMs(valueMs) {
+  try {
+    await redis.set(KEY_TTL_CONFIG_KEY, valueMs);
+    return true;
+  } catch (err) {
+    console.error(
+      "[KEY-TTL] gagal set TTL ke Redis:",
+      err.message || err
+    );
+    return false;
+  }
+}
+
+async function getKeyTtlHours() {
+  const ms = await getKeyTtlMs();
+  return ms / 3600000;
+}
+
 /* ========= REDIS HELPERS ========= */
 
 async function saveKeyForUser({ userId, provider, ip, tier = "free" }) {
+  const ttlMs = await getKeyTtlMs(); // <<== pakai TTL dinamis
   const token = generateKeyToken(tier);
   const createdAt = nowMs();
-  const expiresAfter = createdAt + KEY_TTL_MS;
+  const expiresAfter = createdAt + ttlMs;
 
   const keyInfo = {
     token,
@@ -179,7 +224,7 @@ async function saveKeyForUser({ userId, provider, ip, tier = "free" }) {
 
   // TTL = masa berlaku + 1 jam buffer
   await redis.set(keyKey, keyInfo, {
-    px: KEY_TTL_MS + 60 * 60 * 1000,
+    px: ttlMs + 60 * 60 * 1000,
   });
 
   await redis.lpush(`user:${userId}:keys`, token);
@@ -770,12 +815,14 @@ app.get("/get-key", requireAuth, async (req, res) => {
   const keys = await loadUserKeys(user.id);
   const newKeyToken = req.query.newKey || null;
 
+  const keyTtlHours = await getKeyTtlHours(); // dinamis
+
   res.render("get-key", {
     provider,
     user,
     keys,
     newKeyToken,
-    keyTtlHours: KEY_TTL_MS / 3600000,
+    keyTtlHours,
   });
 });
 
@@ -865,12 +912,56 @@ app.get("/admin", requireAdmin, async (req, res) => {
     delete req.session.cleanupSummary;
   }
 
+  // ambil TTL saat ini untuk ditampilin / diedit di admin-dashboard.ejs
+  const currentKeyTtlMs = await getKeyTtlMs();
+
   res.render("admin-dashboard", {
     user: adminUser,
     scripts,
     keyStats,
     cleanupSummary,
+    keyConfig: {
+      ttlMs: currentKeyTtlMs,
+      ttlHours: currentKeyTtlMs / 3600000,
+      defaultTtlHours: DEFAULT_KEY_TTL_MS / 3600000,
+    },
   });
+});
+
+/* ========= ADMIN: UPDATE KEY TTL (BARU) ========= */
+
+app.post("/admin/update-key-ttl", requireAdmin, async (req, res) => {
+  let { ttlHours } = req.body || {};
+  ttlHours = typeof ttlHours === "string" ? ttlHours.trim() : ttlHours;
+
+  const num = Number(ttlHours);
+
+  if (!ttlHours || isNaN(num) || num <= 0) {
+    req.session.cleanupSummary = {
+      type: "error",
+      message: "TTL harus berupa angka jam yang lebih besar dari 0.",
+    };
+    return res.redirect("/admin");
+  }
+
+  const newTtlMs = Math.round(num * 60 * 60 * 1000);
+
+  const ok = await setKeyTtlMs(newTtlMs);
+  if (!ok) {
+    req.session.cleanupSummary = {
+      type: "error",
+      message:
+        "Gagal menyimpan TTL baru ke Redis. Cek log / konfigurasi Redis.",
+    };
+    return res.redirect("/admin");
+  }
+
+  req.session.cleanupSummary = {
+    type: "success",
+    message: `Durasi key berhasil diupdate menjadi ${num} jam.`,
+  };
+
+  res.redirect("/admin");
 });
 
 /* ========= ADMIN: CLEANUP KEYS (GLOBAL) ========= */
@@ -936,8 +1027,11 @@ app.post("/admin/delete-key", requireAdmin, async (req, res) => {
     } else {
       req.session.cleanupSummary = {
         type: "success",
-        message: `Key ${token} berhasil dihapus. userId=${result.userId ||
-          "unknown"}, removedFromList=${result.removedFromList}, deletedDoc=${result.deletedDoc}`,
+        message: `Key ${token} berhasil dihapus. userId=${
+          result.userId || "unknown"
+        }, removedFromList=${result.removedFromList}, deletedDoc=${
+          result.deletedDoc
+        }`,
       };
     }
   } catch (err) {

@@ -99,6 +99,75 @@
 
       <div class="admin-actions-grid">
 
+        <% 
+          // Hitung TTL current & default (jam) untuk ditampilkan & dipakai di form
+          var ttlHoursDisplay = 3;
+          var defaultTtlHoursDisplay = 3;
+
+          if (keyConfig) {
+            if (typeof keyConfig.ttlHours === 'number') {
+              ttlHoursDisplay = keyConfig.ttlHours;
+            } else if (keyConfig.ttlHours) {
+              var _n = Number(keyConfig.ttlHours);
+              if (!isNaN(_n) && _n > 0) ttlHoursDisplay = _n;
+            }
+
+            if (typeof keyConfig.defaultTtlHours === 'number') {
+              defaultTtlHoursDisplay = keyConfig.defaultTtlHours;
+            } else if (keyConfig.defaultTtlHours) {
+              var _d = Number(keyConfig.defaultTtlHours);
+              if (!isNaN(_d) && _d > 0) defaultTtlHoursDisplay = _d;
+            }
+          }
+        %>
+
+        <!-- Key TTL Config (Get New Key) -->
+        <div class="admin-action-card">
+          <h3>Key TTL (Get New Key)</h3>
+          <p>
+            Mengatur durasi berlaku key yang dihasilkan dari halaman
+            <code>/get-key</code>. Perubahan disimpan di Redis dan berlaku realtime
+            untuk semua instance (tanpa redeploy). Durasi ini juga ditampilkan
+            di UI "Get New Key".
+          </p>
+
+          <div class="ttl-info">
+            <p class="helper-text">
+              <strong>Current TTL:</strong>
+              <span><%= ttlHoursDisplay %> jam</span>
+            </p>
+            <p class="helper-text">
+              <strong>Default TTL (fallback):</strong>
+              <span><%= defaultTtlHoursDisplay %> jam</span>
+            </p>
+          </div>
+
+          <form action="/admin/update-key-ttl" method="post" class="form-inline">
+            <input
+              type="number"
+              step="0.1"
+              min="0.1"
+              name="ttlHours"
+              class="input"
+              value="<%= ttlHoursDisplay %>"
+              placeholder="Durasi key dalam jam (misal: 3, 6, 12)"
+              required
+            />
+            <button
+              type="submit"
+              class="btn btn-primary"
+              onclick="return confirm('Update durasi key menjadi ' + this.form.ttlHours.value + ' jam? Semua key baru akan menggunakan TTL ini.');"
+            >
+              Update Key TTL
+            </button>
+          </form>
+
+          <p class="helper-text">
+            Catatan: perubahan ini <strong>tidak mengubah</strong> key yang sudah
+            dibuat sebelumnya, tapi semua <strong>key baru</strong> akan memakai durasi baru.
+          </p>
+        </div>
+
         <!-- Cleanup All Expired / Deleted / Orphan Keys -->
         <div class="admin-action-card">
           <h3>Cleanup Keys</h3>
@@ -117,7 +186,7 @@
           </form>
         </div>
 
-        <!-- NEW: Cleanup Users (hapus user:*:keys tanpa key aktif) -->
+        <!-- Cleanup Users (hapus user:*:keys tanpa key aktif) -->
         <div class="admin-action-card">
           <h3>Cleanup Users</h3>
           <p>

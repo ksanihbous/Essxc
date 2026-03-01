@@ -55,6 +55,16 @@
       "gameUrl": "https://www.roblox.com/id/games/105555311806207/Build-a-Zoo"
     },
     {
+      "id": "sawahindo",
+      "name": "Sawah Indo",
+      "description": "ExHub script for auto farming, auto sell, npc teleport and etc.",
+      "version": "v1.2",
+      "status": "working",
+      "isFree": false,
+      "thumbnail": "/public/img/sawahindo.png",
+      "gameUrl": "https://www.roblox.com/id/games/83369512629707/SAWAH-Indo"
+    },
+    {
       "id": "indo-place",
       "name": "Indo Place",
       "description": "ExHub script for Indo Place adding automation, teleports, and helpful quality-of-life tweaks.",
@@ -73,16 +83,6 @@
       "isFree": false,
       "thumbnail": "/public/img/indo-ocean.png",
       "gameUrl": "https://www.roblox.com/id/games/71264562913161/Indo-Ocean"
-    },
-    {
-      "id": "prospecting",
-      "name": "Proepecting",
-      "description": "ExHub script for Prospecting featuring optimized farming, automation, and helpful utilities.",
-      "version": "v1.0",
-      "status": "maintenance",
-      "isFree": false,
-      "thumbnail": "/public/img/prospecting.png",
-      "gameUrl": "https://www.roblox.com/id/games/129827112113663/Prospecting"
     },
     {
       "id": "violance-district",
